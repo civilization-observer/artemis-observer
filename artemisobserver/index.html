@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artemis 2 Mission Observer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+        }
+
+        /* ── Overlay panels ── */
+        .panel {
+            position: fixed;
+            background: rgba(5, 10, 25, 0.85);
+            border: 1px solid rgba(0, 180, 255, 0.25);
+            border-radius: 10px;
+            padding: 16px 20px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 10;
+        }
+
+        /* Oben links: ein Panel — Mission, kompakter Zeitstrahl, Legende */
+        #info-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            width: 100%;
+            max-width: 260px;
+            max-height: calc(100vh - 36px);
+            padding: 10px 36px 12px 12px;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        #info-panel .panel-collapse-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 2;
+        }
+
+        #info-panel .mission-block {
+            flex-shrink: 0;
+        }
+
+        .mission-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #0af;
+            margin-bottom: 2px;
+            font-weight: 600;
+        }
+
+        .mission-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 6px;
+            line-height: 1.2;
+        }
+
+        #met-clock {
+            font-size: 21px;
+            font-weight: 700;
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: #0f6;
+            letter-spacing: 0.5px;
+        }
+
+        #phase-name {
+            font-size: 12px;
+            color: #8cf;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .realtime-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #68a;
+            margin-top: 8px;
+            margin-bottom: 2px;
+        }
+
+        #real-time-mez {
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: #cde;
+            letter-spacing: 0.3px;
+        }
+
+        /* Zeitstrahl im oberen Panel — niedrige Höhe, intern scrollbar */
+        #info-panel #timeline-panel {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 180, 255, 0.2);
+            flex: 0 1 auto;
+            min-height: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 2px;
+        }
+
+        #info-panel #timeline-panel .tl-title {
+            margin-bottom: 6px;
+        }
+
+        #info-panel #timeline-panel .tl-item {
+            padding: 4px 0;
+        }
+
+        #info-panel #timeline-panel .tl-line {
+            min-height: 14px;
+        }
+
+        #info-panel #timeline-panel .tl-name {
+            font-size: 10px;
+        }
+
+        #info-panel #timeline-panel .tl-item.active .tl-name {
+            font-size: 11px;
+        }
+
+        #info-panel #timeline-panel::-webkit-scrollbar { width: 3px; }
+        #info-panel #timeline-panel::-webkit-scrollbar-thumb {
+            background: rgba(0, 150, 255, 0.35);
+            border-radius: 2px;
+        }
+
+        #info-panel #legend {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 180, 255, 0.2);
+            pointer-events: none;
+            flex-shrink: 0;
+        }
+
+        /* Telemetrie im linken Panel — zwischen Zeitstrahl und Legende */
+        #info-panel #telemetry-panel {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 180, 255, 0.2);
+            flex-shrink: 0;
+            text-align: left;
+        }
+
+        #info-panel #telemetry-panel .telem-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .telem-row {
+            margin-bottom: 8px;
+        }
+
+        .telem-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #68a;
+            margin-bottom: 2px;
+        }
+
+        #info-panel #telemetry-panel .telem-value {
+            font-size: 16px;
+        }
+
+        .telem-value {
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+
+        #dist-earth { color: #4df; }
+        #dist-moon { color: #ccc; }
+        #velocity { color: #f84; }
+
+        .telem-imperial {
+            font-size: 11px;
+            color: #556;
+            font-family: 'Consolas', 'Courier New', monospace;
+            margin-top: 1px;
+        }
+
+        /* Rechts oben: News-Feed */
+        #launch-feed-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            max-height: calc(100vh - 40px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            padding: 12px 14px;
+        }
+
+        #launch-feed-panel .launch-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        #launch-feed-panel .launch-head .lf-header {
+            margin-bottom: 0;
+        }
+
+        #launch-feed-panel .lf-header {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #68a;
+            margin-bottom: 6px;
+        }
+
+        #launch-feed-panel .lf-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #eaf;
+            margin-bottom: 4px;
+        }
+
+        #launch-feed-panel .lf-source {
+            font-size: 9px;
+            color: #556;
+            margin-bottom: 10px;
+            line-height: 1.35;
+        }
+
+        #launch-feed-status {
+            font-size: 9px;
+            color: #567;
+            margin-bottom: 8px;
+        }
+
+        #launch-feed-items {
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 4px;
+            min-height: 80px;
+        }
+
+        #launch-feed-items::-webkit-scrollbar { width: 3px; }
+        #launch-feed-items::-webkit-scrollbar-thumb { background: rgba(180,100,255,0.35); border-radius: 2px; }
+
+        /* Unten rechts: YouTube-Livestream (über Fortschrittsleiste & Steuerung) */
+        #livestream-panel {
+            position: fixed;
+            bottom: 155px;
+            right: 24px;
+            width: min(360px, calc(100vw - 48px));
+            padding: 8px 10px 10px;
+            z-index: 11;
+            max-width: calc(100vw - 48px);
+        }
+
+        #livestream-panel .livestream-head {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #8ac;
+            margin-bottom: 6px;
+            padding: 6px 8px;
+            margin: -6px -6px 6px -6px;
+            border-radius: 6px;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #livestream-panel .livestream-head:hover {
+            background: rgba(0, 140, 220, 0.12);
+        }
+
+        #livestream-panel .livestream-head:active {
+            cursor: grabbing;
+        }
+
+        #livestream-panel .livestream-frame-wrap {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #000;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+        }
+
+        #livestream-panel .livestream-frame-wrap iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .launch-item {
+            border-bottom: 1px solid rgba(0, 150, 255, 0.12);
+            padding: 10px 0;
+        }
+
+        .launch-item:last-child { border-bottom: none; }
+
+        .launch-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #e8f0ff;
+            line-height: 1.35;
+            margin-bottom: 4px;
+        }
+
+        .launch-org {
+            font-size: 10px;
+            font-weight: 600;
+            color: #9ab;
+            letter-spacing: 0.2px;
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .launch-meta {
+            font-size: 10px;
+            color: #789;
+            line-height: 1.4;
+        }
+
+        .launch-countdown {
+            font-size: 11px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: #fa0;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+
+        .launch-net {
+            font-size: 9px;
+            color: #556;
+            margin-top: 3px;
+        }
+
+        .launch-error {
+            font-size: 11px;
+            color: #c88;
+            line-height: 1.45;
+        }
+
+        .lf-refresh {
+            font-size: 10px;
+            color: #6ad;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        .lf-refresh:hover { color: #8cf; }
+
+        .tl-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #68a;
+            margin-bottom: 10px;
+        }
+
+        .tl-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 0;
+            padding: 6px 0;
+            position: relative;
+        }
+
+        .tl-track {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 12px;
+            flex-shrink: 0;
+        }
+
+        .tl-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #334;
+            border: 1.5px solid #445;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .tl-line {
+            width: 1.5px;
+            flex-grow: 1;
+            min-height: 20px;
+            background: #223;
+        }
+
+        .tl-item.done .tl-dot { background: #0a8; border-color: #0a8; }
+        .tl-item.done .tl-line { background: rgba(0,170,128,0.3); }
+        .tl-item.active .tl-dot {
+            background: #0ff; border-color: #0ff;
+            box-shadow: 0 0 8px rgba(0,255,255,0.6);
+        }
+        .tl-item.active .tl-line { background: linear-gradient(to bottom, rgba(0,255,255,0.3), #223); }
+        .tl-item.future .tl-dot { background: #223; border-color: #445; }
+
+        .tl-content { flex: 1; min-width: 0; padding-top: 0; }
+
+        .tl-name {
+            font-size: 11px;
+            color: #667;
+            line-height: 1.3;
+        }
+        .tl-item.done .tl-name { color: #6a8; }
+        .tl-item.active .tl-name { color: #fff; font-weight: 600; font-size: 12px; }
+
+        .tl-time {
+            font-size: 9px;
+            font-family: 'Consolas', monospace;
+            color: #445;
+            margin-top: 1px;
+        }
+        .tl-item.done .tl-time { color: #567; }
+        .tl-item.active .tl-time { color: #fa0; font-size: 11px; font-weight: 700; }
+
+        /* Bottom: Controls */
+        #controls-panel {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            padding: 36px 24px 12px 24px;
+            max-width: min(96vw, 920px);
+        }
+
+        #controls-panel .panel-collapse-btn {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            z-index: 2;
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .zoom-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(0, 150, 255, 0.15);
+        }
+
+        #zoom-slider {
+            flex: 1;
+            min-width: 160px;
+            max-width: 340px;
+            height: 6px;
+            accent-color: #0af;
+            cursor: pointer;
+        }
+
+        #zoom-readout {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            color: #8ac;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .ctrl-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ctrl-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #68a;
+            margin-right: 4px;
+        }
+
+        .warp-btn, .action-btn {
+            background: rgba(0, 150, 255, 0.1);
+            border: 1px solid rgba(0, 150, 255, 0.3);
+            color: #acd;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .warp-btn:hover, .action-btn:hover {
+            background: rgba(0, 150, 255, 0.25);
+            border-color: rgba(0, 180, 255, 0.6);
+            color: #fff;
+        }
+
+        .warp-btn.active {
+            background: rgba(0, 180, 255, 0.35);
+            border-color: #0af;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(0, 170, 255, 0.3);
+        }
+
+        .action-btn.active {
+            background: rgba(0, 255, 140, 0.2);
+            border-color: rgba(0, 255, 140, 0.5);
+            color: #0f8;
+        }
+
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: rgba(0, 150, 255, 0.2);
+            margin: 0 6px;
+        }
+
+        /* Progress bar */
+        #progress-bar {
+            position: fixed;
+            bottom: 125px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            max-width: 80vw;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            z-index: 10;
+        }
+
+        #progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0af, #0f6);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        #warp-display {
+            font-family: 'Consolas', monospace;
+            color: #ff8;
+            font-size: 14px;
+            font-weight: 700;
+            min-width: 72px;
+            text-align: center;
+        }
+
+        #legend {
+            font-size: 10px;
+            text-align: left;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+            margin-bottom: 3px;
+            color: #889;
+        }
+
+        .legend-item:last-child { margin-bottom: 0; }
+
+        .legend-color {
+            width: 16px;
+            height: 2px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .legend-color.past { background: #0df; }
+        .legend-color.future {
+            background: repeating-linear-gradient(
+                90deg, #fff 0px, #fff 4px, transparent 4px, transparent 8px
+            );
+            opacity: 0.4;
+        }
+        .legend-color.orion {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #0fa;
+            box-shadow: 0 0 4px #0fa;
+        }
+        .legend-color.moonorbit {
+            background: repeating-linear-gradient(
+                90deg, #c8d8e8 0px, #c8d8e8 3px, transparent 3px, transparent 6px
+            );
+            opacity: 0.75;
+        }
+        .legend-color.npole {
+            width: 14px; height: 2px;
+            background: #f44;
+            border-radius: 1px;
+        }
+        .legend-color.sun {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #ffe888;
+            box-shadow: 0 0 4px #ffcc44;
+        }
+        .legend-color.earthorbit {
+            background: repeating-linear-gradient(
+                90deg, #fa4 0px, #fa4 3px, transparent 3px, transparent 6px
+            );
+            opacity: 0.4;
+        }
+
+        /* Panel-Sichtbarkeit (Klassen am body, gesteuert von app.js) */
+        body.ui-hide-info #info-panel { display: none !important; }
+        body.ui-hide-launch #launch-feed-panel { display: none !important; }
+        body.ui-hide-controls #controls-panel,
+        body.ui-hide-controls #progress-bar { display: none !important; }
+
+        /* Ausblenden — je Panel oben rechts */
+        .panel-collapse-btn {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            line-height: 24px;
+            font-size: 17px;
+            font-weight: 400;
+            color: #8ac;
+            background: rgba(0, 40, 60, 0.45);
+            border: 1px solid rgba(0, 180, 255, 0.28);
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: color 0.15s, border-color 0.15s, background 0.15s;
+        }
+
+        .panel-collapse-btn:hover {
+            color: #cef;
+            border-color: rgba(0, 200, 255, 0.5);
+            background: rgba(0, 60, 90, 0.55);
+        }
+
+        /* Wieder einblenden — schmale Leiste am Rand (nur wenn Panel aus) */
+        .panel-restore-tab {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            font-size: 11px;
+            font-family: inherit;
+            padding: 8px 10px;
+            color: #8ac;
+            background: rgba(5, 10, 25, 0.92);
+            border: 1px solid rgba(0, 180, 255, 0.35);
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .panel-restore-tab:hover {
+            color: #cef;
+            border-color: rgba(0, 200, 255, 0.55);
+        }
+
+        body.ui-hide-info #panel-restore-info { display: block; }
+        body.ui-hide-launch #panel-restore-launch { display: block; }
+        body.ui-hide-controls #panel-restore-controls { display: block; }
+
+        #panel-restore-info {
+            left: 0;
+            top: 24px;
+            border-radius: 0 8px 8px 0;
+            border-left: none;
+        }
+
+        #panel-restore-launch {
+            right: 0;
+            top: 24px;
+            border-radius: 8px 0 0 8px;
+            border-right: none;
+        }
+
+        #panel-restore-controls {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 8px 8px 0 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #info-panel { padding: 12px 36px 12px 14px; }
+            .mission-name { font-size: 17px; }
+            #met-clock { font-size: 22px; }
+            #info-panel #telemetry-panel .telem-value { font-size: 15px; }
+            .telem-value { font-size: 16px; }
+            .telem-imperial { font-size: 9px; }
+            #controls-panel { padding: 32px 16px 10px 16px; gap: 6px; }
+            .warp-btn, .action-btn { padding: 5px 8px; font-size: 11px; }
+            #info-panel #legend { display: none; }
+            #info-panel #timeline-panel { display: none; }
+            #launch-feed-panel { display: none; }
+            #livestream-panel {
+                width: min(260px, calc(100vw - 20px));
+                right: 10px;
+                bottom: 148px;
+            }
+            #panel-restore-launch { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- Links: ein Panel — Mission, Zeitstrahl (kompakt), Legende -->
+    <div class="panel" id="info-panel">
+        <button type="button" class="panel-collapse-btn" data-panel="info" title="Infobereich ausblenden (Taste H: alle)" aria-label="Infobereich ausblenden">−</button>
+        <div class="mission-block">
+            <div class="mission-title">NASA Artemis Programm</div>
+            <div class="mission-name">Artemis II - Orion</div>
+            <div style="font-size:8px;color:#567;margin-bottom:6px;">Quelle: NASA/JSC Ephemeris (OEM)</div>
+            <div id="met-clock">T+ 0d 00:00:00</div>
+            <div id="phase-name">Initialisierung...</div>
+            <div class="realtime-label">Datum &amp; Uhrzeit (MEZ)</div>
+            <div id="real-time-mez">--</div>
+        </div>
+        <div id="timeline-panel">
+            <div class="tl-title">Missions-Zeitstrahl</div>
+            <div id="timeline-items"></div>
+        </div>
+        <div id="telemetry-panel">
+            <div class="telem-row">
+                <div class="telem-label">Entfernung zur Erde</div>
+                <div class="telem-value" id="dist-earth">-- km</div>
+                <div class="telem-imperial" id="dist-earth-mi">-- mi</div>
+            </div>
+            <div class="telem-row">
+                <div class="telem-label">Abstand zum Mond</div>
+                <div class="telem-value" id="dist-moon">-- km</div>
+                <div class="telem-imperial" id="dist-moon-mi">-- mi</div>
+            </div>
+            <div class="telem-row">
+                <div class="telem-label">Geschwindigkeit</div>
+                <div class="telem-value" id="velocity">-- km/s</div>
+                <div class="telem-imperial" id="velocity-mi">-- mph</div>
+            </div>
+        </div>
+        <div id="legend">
+            <div class="legend-item">
+                <div class="legend-color orion"></div>
+                <span>Orion-Kapsel</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color past"></div>
+                <span>Bisherige Flugspur</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color future"></div>
+                <span>Geplante Route</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color moonorbit"></div>
+                <span>Mondumlaufbahn</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color npole"></div>
+                <span>Erdachse (N/S)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color sun"></div>
+                <span>Sonne + Planeten</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rocket launches (rechts oben) -->
+    <div class="panel" id="launch-feed-panel">
+        <div class="launch-head">
+            <div class="lf-header">News</div>
+            <button type="button" class="panel-collapse-btn" data-panel="launch" title="News ausblenden (Taste H: alle)" aria-label="News-Panel ausblenden">−</button>
+        </div>
+        <div class="lf-title">Raketenstarts von der Erde</div>
+        <div class="lf-source">Geplante und bestätigte Starts (Startplätze mit Koordinaten). Quelle: The Space Devs · Launch Library</div>
+        <div id="launch-feed-status">Lade …</div>
+        <div id="launch-feed-items"></div>
+        <span class="lf-refresh" id="launch-feed-refresh" role="button" tabindex="0">Jetzt aktualisieren</span>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-bar">
+        <div id="progress-fill"></div>
+    </div>
+
+    <!-- Livestream (unten rechts) — https://www.youtube.com/watch?v=m3kR2KK8TEs -->
+    <div class="panel" id="livestream-panel" aria-label="YouTube Livestream">
+        <div class="livestream-head" id="livestream-drag-handle" title="Ziehen zum Verschieben">Live</div>
+        <div class="livestream-frame-wrap">
+            <iframe
+                src="https://www.youtube.com/embed/m3kR2KK8TEs?rel=0&amp;modestbranding=1"
+                title="YouTube Livestream"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <!-- Wiederherstellen (nur sichtbar wenn jeweiliges Panel ausgeblendet) -->
+    <button type="button" class="panel-restore-tab" id="panel-restore-info" data-panel="info" title="Infobereich einblenden · Taste H: alle ein/aus" aria-label="Infobereich einblenden">Links ▶</button>
+    <button type="button" class="panel-restore-tab" id="panel-restore-launch" data-panel="launch" title="News einblenden · Taste H: alle ein/aus" aria-label="News einblenden">News ▶</button>
+    <button type="button" class="panel-restore-tab" id="panel-restore-controls" data-panel="controls" title="Steuerung einblenden · Taste H: alle ein/aus" aria-label="Zoom und Steuerung einblenden">Steuerung ▶</button>
+
+    <!-- Controls (bottom center) -->
+    <div class="panel" id="controls-panel">
+        <button type="button" class="panel-collapse-btn" data-panel="controls" title="Steuerung ausblenden (Taste H: alle)" aria-label="Zoom und Steuerung ausblenden">−</button>
+        <div class="zoom-row" title="Logarithmische Skala: rechts = weiter weg. Ab ca. 100 Mio km Abstand erscheinen alle Umlaufbahnen.">
+            <span class="ctrl-label">Zoom</span>
+            <input type="range" id="zoom-slider" min="0" max="1000" value="500" step="1" />
+            <span id="zoom-readout">--</span>
+        </div>
+        <div class="controls-row">
+            <div class="ctrl-group">
+                <span class="ctrl-label">Zeitraffer</span>
+                <button class="warp-btn active" data-warp="1" onclick="setTimeWarp(1)">1×</button>
+                <button class="warp-btn" data-warp="1000" onclick="setTimeWarp(1000)">1000×</button>
+                <button class="warp-btn" data-warp="10000" onclick="setTimeWarp(10000)">10.000×</button>
+                <button class="warp-btn" data-warp="100000" onclick="setTimeWarp(100000)">100.000×</button>
+                <span id="warp-display">1x</span>
+            </div>
+            <div class="separator"></div>
+            <button class="action-btn" id="follow-btn" onclick="toggleFollow()">Orion folgen</button>
+            <button class="action-btn" id="moon-btn" onclick="toggleMoonView()">Mond-Sicht</button>
+            <button class="action-btn" onclick="resetView()">Erde</button>
+            <button class="action-btn" onclick="solarSystemView()">Sonnensystem</button>
+            <button class="action-btn" onclick="jumpToNow()">Jetzt</button>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const panel = document.getElementById('livestream-panel');
+        const handle = document.getElementById('livestream-drag-handle');
+        if (!panel || !handle) return;
+
+        const POS_KEY = 'artemisobserver-livestream-pos';
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let origLeft = 0;
+        let origTop = 0;
+
+        function toLeftTop() {
+            const r = panel.getBoundingClientRect();
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+            panel.style.left = r.left + 'px';
+            panel.style.top = r.top + 'px';
+        }
+
+        function clampPosition() {
+            let l = parseFloat(panel.style.left);
+            let t = parseFloat(panel.style.top);
+            if (isNaN(l) || isNaN(t)) return;
+            const w = panel.offsetWidth;
+            const h = panel.offsetHeight;
+            const maxL = Math.max(8, window.innerWidth - w - 8);
+            const maxT = Math.max(8, window.innerHeight - h - 8);
+            l = Math.max(8, Math.min(l, maxL));
+            t = Math.max(8, Math.min(t, maxT));
+            panel.style.left = l + 'px';
+            panel.style.top = t + 'px';
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        }
+
+        function savePosition() {
+            try {
+                const l = parseFloat(panel.style.left);
+                const t = parseFloat(panel.style.top);
+                if (!isNaN(l) && !isNaN(t)) {
+                    localStorage.setItem(POS_KEY, JSON.stringify({ left: l, top: t }));
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function restorePosition() {
+            try {
+                const raw = localStorage.getItem(POS_KEY);
+                if (!raw) return;
+                const p = JSON.parse(raw);
+                if (typeof p.left !== 'number' || typeof p.top !== 'number') return;
+                panel.style.right = 'auto';
+                panel.style.bottom = 'auto';
+                panel.style.left = p.left + 'px';
+                panel.style.top = p.top + 'px';
+                clampPosition();
+            } catch (e) { /* ignore */ }
+        }
+
+        handle.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            toLeftTop();
+            const r = panel.getBoundingClientRect();
+            origLeft = r.left;
+            origTop = r.top;
+            startX = e.clientX;
+            startY = e.clientY;
+            dragging = true;
+            handle.style.cursor = 'grabbing';
+            try {
+                handle.setPointerCapture(e.pointerId);
+            } catch (err) { /* ignore */ }
+        });
+
+        handle.addEventListener('pointermove', function (e) {
+            if (!dragging) return;
+            const w = panel.offsetWidth;
+            const h = panel.offsetHeight;
+            let nl = origLeft + (e.clientX - startX);
+            let nt = origTop + (e.clientY - startY);
+            const maxL = Math.max(8, window.innerWidth - w - 8);
+            const maxT = Math.max(8, window.innerHeight - h - 8);
+            nl = Math.max(8, Math.min(nl, maxL));
+            nt = Math.max(8, Math.min(nt, maxT));
+            panel.style.left = nl + 'px';
+            panel.style.top = nt + 'px';
+        });
+
+        function endDrag(e) {
+            if (!dragging) return;
+            dragging = false;
+            handle.style.cursor = 'grab';
+            try {
+                if (e.pointerId != null) handle.releasePointerCapture(e.pointerId);
+            } catch (err) { /* ignore */ }
+            savePosition();
+        }
+
+        handle.addEventListener('pointerup', endDrag);
+        handle.addEventListener('pointercancel', endDrag);
+
+        window.addEventListener('resize', function () {
+            if (panel.style.left && panel.style.top) {
+                clampPosition();
+                savePosition();
+            }
+        });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', restorePosition);
+        } else {
+            restorePosition();
+        }
+    })();
+    </script>
+
+    <!-- Trajectory data (plain script, no module) -->
+    <script src="trajectory.js"></script>
+
+    <!-- Three.js via import map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="app.js"></script>
+
+</body>
+</html>
