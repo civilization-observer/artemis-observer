@@ -488,7 +488,7 @@
         .ctrl-mode-tabs {
             display: flex;
             gap: 0;
-            margin: 0 40px 10px 0;
+            margin: 0 auto 10px;
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid rgba(0, 150, 255, 0.35);
@@ -712,28 +712,6 @@
             margin: 0 6px;
         }
 
-        /* Progress bar */
-        #progress-bar {
-            position: fixed;
-            bottom: 125px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 500px;
-            max-width: 80vw;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 2px;
-            z-index: 10;
-        }
-
-        #progress-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #0af, #0f6);
-            border-radius: 2px;
-            transition: width 0.3s;
-        }
-
         #warp-display {
             font-family: 'Consolas', monospace;
             color: #ff8;
@@ -806,8 +784,7 @@
         /* Panel-Sichtbarkeit (Klassen am body, gesteuert von app.js) */
         body.ui-hide-info #info-panel { display: none !important; }
         body.ui-hide-launch #launch-feed-panel { display: none !important; }
-        body.ui-hide-controls #controls-panel,
-        body.ui-hide-controls #progress-bar { display: none !important; }
+        body.ui-hide-controls #controls-panel { display: none !important; }
 
         /* Ausblenden — je Panel oben rechts */
         .panel-collapse-btn {
@@ -985,11 +962,6 @@
         <div id="launch-feed-status">Lade …</div>
         <div id="launch-feed-items"></div>
         <span class="lf-refresh" id="launch-feed-refresh" role="button" tabindex="0">Jetzt aktualisieren</span>
-    </div>
-
-    <!-- Progress -->
-    <div id="progress-bar">
-        <div id="progress-fill"></div>
     </div>
 
     <!-- Livestream (unten rechts) — https://www.youtube.com/watch?v=m3kR2KK8TEs -->

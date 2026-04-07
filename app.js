@@ -938,8 +938,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         updateTimeline(metHours);
 
-        const progress = Math.max(0, Math.min(1, metHours / totalMET_hours)) * 100;
-        document.getElementById('progress-fill').style.width = progress + '%';
         document.getElementById('warp-display').textContent = formatWarpLabel(timeWarp);
 
         const rt = document.getElementById('real-time-mez');
