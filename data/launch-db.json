@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T13:07:28Z",
+  "generatedAt": "2026-04-19T14:02:35Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -545,13 +545,13 @@
       "status": "live",
       "statusName": "Launch in Flight",
       "statusAbbrev": "In Flight",
-      "statusDescription": "The launch vehicle has lifted off from the launchpad.",
+      "statusDescription": "Launch in Flight",
       "livestreamUrl": "https://www.youtube.com/watch?v=enQ_IXtfm9I",
       "sourceUrl": "https://www.blueorigin.com/missions/ng-3",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/53769468-bfd3-45c7-a52b-46a68ed7510f/",
-      "updatedAt": "2026-04-19T13:07:28Z",
+      "updatedAt": "2026-04-19T14:02:35Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
-      "postflightCheckedAt": "2026-04-19T13:07:28Z",
+      "postflightCheckedAt": "2026-04-19T14:02:35Z",
       "postflightStatus": "live",
       "preflightCheckedAt": "2026-04-19T13:07:28Z",
       "preflightStatus": "missed"
