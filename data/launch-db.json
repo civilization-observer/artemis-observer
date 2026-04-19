@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-19T16:22:34Z",
+  "generatedAt": "2026-04-19T17:06:08Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -530,18 +530,18 @@
       "statusName": "Launch in Flight",
       "statusAbbrev": "In Flight",
       "statusDescription": "The launch vehicle has lifted off from the launchpad.",
-      "livestreamUrl": "https://www.youtube.com/watch?v=FVpZ1n7sF9I",
+      "livestreamUrl": "https://www.youtube.com/watch?v=obwUMaY0KUs",
       "sourceUrl": "https://www.spacex.com/launches/sl-17-22",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/0727a92f-0a9c-4e01-9bf4-1dc698e17e6b/",
-      "updatedAt": "2026-04-19T16:22:34Z",
+      "updatedAt": "2026-04-19T17:06:08Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-19T14:35:59Z"
       ],
       "preflightCheckedAt": "2026-04-19T16:22:34Z",
-      "postflightCheckedAt": null,
+      "postflightCheckedAt": "2026-04-19T17:06:08Z",
       "preflightStatus": "go",
-      "postflightStatus": ""
+      "postflightStatus": "live"
     },
     {
       "id": "53769468-bfd3-45c7-a52b-46a68ed7510f",
@@ -563,9 +563,9 @@
       "livestreamUrl": "https://www.youtube.com/watch?v=enQ_IXtfm9I",
       "sourceUrl": "https://www.blueorigin.com/missions/ng-3",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/53769468-bfd3-45c7-a52b-46a68ed7510f/",
-      "updatedAt": "2026-04-19T16:22:34Z",
+      "updatedAt": "2026-04-19T17:06:08Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
-      "postflightCheckedAt": "2026-04-19T16:22:34Z",
+      "postflightCheckedAt": "2026-04-19T17:06:08Z",
       "postflightStatus": "live",
       "preflightCheckedAt": "2026-04-19T13:07:28Z",
       "preflightStatus": "missed"
