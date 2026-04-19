@@ -18,6 +18,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const LAUNCH_SUCCESS_CHECK_DELAY_MS = 30 * 60 * 1000;
     const LAUNCH_DATA_REFRESH_MS = 15 * 60 * 1000;
     const SATELLITE_TLE_URL = 'data/active-satellites.tle';
+    const ISS_OEM_URL = 'data/iss-oem-j2k.txt';
+    const ISS_NORAD_ID = '25544';
     const SATELLITE_LIB_CANDIDATES = [
         'https://unpkg.com/satellite.js/dist/satellite.min.js',
         'https://cdn.jsdelivr.net/npm/satellite.js@6.0.2/dist/satellite.min.js',
@@ -31,10 +33,25 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const ORBITS_ALL_DISTANCE = 100000;
     const ZOOM_DIST_MIN = 2.6;
     const ZOOM_DIST_MAX = 10000000;
-    const EARTH_TEX_URL = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
-    const EARTH_BUMP_TEX_URL = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
-    const EARTH_NIGHT_TEX_URL = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
-    const EARTH_CLOUD_TEX_URL = 'https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png';
+    const EARTH_TEX_URLS = [
+        'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+        'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg',
+        'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg'
+    ];
+    const EARTH_BUMP_TEX_URLS = [
+        'https://unpkg.com/three-globe/example/img/earth-topology.png',
+        'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png',
+        'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-topology.png'
+    ];
+    const EARTH_NIGHT_TEX_URLS = [
+        'https://unpkg.com/three-globe/example/img/earth-night.jpg',
+        'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg',
+        'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-night.jpg'
+    ];
+    const EARTH_CLOUD_TEX_URLS = [
+        'https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png',
+        'https://cdn.jsdelivr.net/gh/turban/webgl-earth/images/fair_clouds_4k.png'
+    ];
     const MOON_TEX_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Solarsystemscope_texture_2k_moon.jpg/1024px-Solarsystemscope_texture_2k_moon.jpg';
     const SATELLITE_RESULT_LIMIT = 40;
     const SATELLITES_IN_ORBIT_ESTIMATE = 16910;
@@ -46,6 +63,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const SATELLITE_LAYER_OPACITY = 0.88;
     const SATELLITE_LAYER_DIMMED_OPACITY = 0.22;
     const SATELLITE_PICK_THRESHOLD = 0.18;
+    const SATELLITE_ORBIT_SAMPLE_COUNT = 360;
+    const SATELLITE_ORBIT_DEFAULT_REVOLUTIONS = 2;
+    const SATELLITE_ORBIT_MIN_REVOLUTIONS = 1;
+    const SATELLITE_ORBIT_MAX_REVOLUTIONS = 5;
+    const SATELLITE_ORBIT_REFRESH_MS = 30 * 1000;
     const SCENE_CLICK_DRAG_TOLERANCE_PX = 7;
 
     const localDateTime = new Intl.DateTimeFormat(undefined, {
@@ -159,6 +181,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         earthCloudMesh: null,
         earthAtmosphereMesh: null,
         earthGlowMesh: null,
+        earthNightUniforms: null,
         earthRotationAngle: 0,
         moonMesh: null,
         sunMesh: null,
@@ -185,6 +208,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         observerWatchId: null,
         satellitePoints: null,
         satelliteHighlight: null,
+        satelliteOrbitLine: null,
+        satelliteOrbitLastKey: '',
         satelliteCatalog: [],
         satelliteIndex: new Map(),
         satelliteCatalogLoaded: false,
@@ -195,6 +220,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         satelliteFilters: { LEO: true, MEO: true, GEO: true, HEO: true },
         satelliteWorldPositions: new Map(),
         satelliteDrawOrder: [],
+        issOemSamples: [],
+        issOemLoaded: false,
+        issOemPromise: null,
+        issOemError: '',
         followSatelliteId: null,
         satelliteAutoHidNews: false,
         followObserver: false,
@@ -224,6 +253,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         sceneClickBlockedUntil: 0,
         launches: [],
         selectedLaunchId: null,
+        launchDetailActive: false,
         launchFeedMode: 'upcoming',
         launchHistoryItems: [],
         launchHistoryNextUrl: '',
@@ -269,12 +299,27 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             window.matchMedia('(max-width: 960px)').matches;
     }
 
+    function clampSatelliteOrbitRevolutions(value) {
+        return THREE.MathUtils.clamp(
+            Math.round(Number(value) || SATELLITE_ORBIT_DEFAULT_REVOLUTIONS),
+            SATELLITE_ORBIT_MIN_REVOLUTIONS,
+            SATELLITE_ORBIT_MAX_REVOLUTIONS
+        );
+    }
+
     function readUiState() {
-        const defaults = { news: true, watch: true, controls: true };
+        const defaults = {
+            news: true,
+            watch: true,
+            controls: true,
+            orbitRevolutions: SATELLITE_ORBIT_DEFAULT_REVOLUTIONS
+        };
         try {
             const raw = localStorage.getItem(UI_STORAGE_KEY);
             if (!raw) return defaults;
-            return { ...defaults, ...JSON.parse(raw) };
+            const parsed = { ...defaults, ...JSON.parse(raw) };
+            parsed.orbitRevolutions = clampSatelliteOrbitRevolutions(parsed.orbitRevolutions);
+            return parsed;
         } catch (error) {
             return defaults;
         }
@@ -330,9 +375,120 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         }
     }
 
+    function parseOemTimestamp(value) {
+        const text = String(value || '').trim();
+        const dayOfYearMatch = text.match(/^(\d{4})-(\d{3})T(.+)$/);
+        if (dayOfYearMatch) {
+            const year = Number(dayOfYearMatch[1]);
+            const dayOfYear = Number(dayOfYearMatch[2]);
+            const rest = dayOfYearMatch[3].replace(/Z$/, '');
+            const [timePart, fractionPart = ''] = rest.split('.');
+            const [hour = 0, minute = 0, second = 0] = timePart.split(':').map(Number);
+            const millisecond = Number((fractionPart + '000').slice(0, 3)) || 0;
+            const dateMs = Date.UTC(year, 0, 1, hour, minute, second, millisecond) + (dayOfYear - 1) * 86400000;
+            return Number.isFinite(dateMs) ? dateMs : NaN;
+        }
+
+        const dateMs = Date.parse(text.endsWith('Z') ? text : `${text}Z`);
+        return Number.isFinite(dateMs) ? dateMs : NaN;
+    }
+
+    function parseIssOemText(rawText) {
+        return String(rawText || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line && /^\d{4}-/.test(line))
+            .map((line) => {
+                const parts = line.split(/\s+/);
+                if (parts.length < 7) return null;
+                const epochMs = parseOemTimestamp(parts[0]);
+                const positionKm = parts.slice(1, 4).map(Number);
+                const velocityKmS = parts.slice(4, 7).map(Number);
+                if (!Number.isFinite(epochMs) ||
+                    positionKm.some((entry) => !Number.isFinite(entry)) ||
+                    velocityKmS.some((entry) => !Number.isFinite(entry))) {
+                    return null;
+                }
+                return { epochMs, positionKm, velocityKmS };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.epochMs - b.epochMs);
+    }
+
+    function j2kPositionToSceneVector(positionKm) {
+        return new THREE.Vector3(
+            -positionKm[1] / 1000,
+            positionKm[2] / 1000,
+            -positionKm[0] / 1000
+        );
+    }
+
+    function interpolateIssOemPosition(dateMs) {
+        const samples = state.issOemSamples;
+        if (!samples.length || dateMs < samples[0].epochMs || dateMs > samples[samples.length - 1].epochMs) {
+            return null;
+        }
+
+        let low = 0;
+        let high = samples.length - 1;
+        while (high - low > 1) {
+            const mid = Math.floor((low + high) / 2);
+            if (samples[mid].epochMs <= dateMs) low = mid;
+            else high = mid;
+        }
+
+        const a = samples[low];
+        const b = samples[Math.min(low + 1, samples.length - 1)];
+        if (!a || !b || a === b) return a ? j2kPositionToSceneVector(a.positionKm) : null;
+
+        const spanSeconds = (b.epochMs - a.epochMs) / 1000;
+        if (spanSeconds <= 0) return j2kPositionToSceneVector(a.positionKm);
+        const t = THREE.MathUtils.clamp((dateMs - a.epochMs) / (b.epochMs - a.epochMs), 0, 1);
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const h00 = 2 * t3 - 3 * t2 + 1;
+        const h10 = t3 - 2 * t2 + t;
+        const h01 = -2 * t3 + 3 * t2;
+        const h11 = t3 - t2;
+        const positionKm = [0, 1, 2].map((index) =>
+            h00 * a.positionKm[index] +
+            h10 * spanSeconds * a.velocityKmS[index] +
+            h01 * b.positionKm[index] +
+            h11 * spanSeconds * b.velocityKmS[index]
+        );
+        return j2kPositionToSceneVector(positionKm);
+    }
+
+    async function loadIssOemData() {
+        if (state.issOemPromise) return state.issOemPromise;
+        state.issOemPromise = fetch(ISS_OEM_URL, { cache: 'no-cache' })
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.text();
+            })
+            .then((rawText) => {
+                const samples = parseIssOemText(rawText);
+                if (samples.length < 2) throw new Error('ISS OEM enthaelt zu wenige State-Vektoren');
+                state.issOemSamples = samples;
+                state.issOemLoaded = true;
+                state.issOemError = '';
+                propagateSatellites(true);
+                updateSatelliteOrbitPath(true);
+                return samples;
+            })
+            .catch((error) => {
+                state.issOemSamples = [];
+                state.issOemLoaded = false;
+                state.issOemError = error?.message || 'ISS OEM nicht verfuegbar';
+                return [];
+            });
+        return state.issOemPromise;
+    }
+
     function cacheDom() {
         [
             'canvas-container',
+            'overview-panel',
             'real-time-zone',
             'real-time-berlin',
             'search-toggle',
@@ -363,6 +519,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'settings-toggle',
             'settings-close',
             'settings-scrim',
+            'satellite-orbit-revolutions',
+            'satellite-orbit-revolutions-readout',
             'launch-stat-total',
             'launch-stat-countdown',
             'launch-stat-orgs',
@@ -376,6 +534,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'sat-stat-total',
             'sat-stat-live',
             'scene-mode-pill',
+            'mission-control-panel',
+            'mission-control-close',
             'focus-next-launch',
             'launch-feed-status',
             'launch-feed-items',
@@ -436,16 +596,61 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         });
     }
 
+    function applyLaunchDetailPanelState() {
+        const active = Boolean(state.launchDetailActive);
+        const watchVisible = Boolean(state.panelVisibility.watch);
+        document.body.classList.toggle('launch-detail-active', active);
+        if (dom['mission-control-panel']) {
+            dom['mission-control-panel'].setAttribute('aria-hidden', String(!active || !watchVisible));
+        }
+        if (dom['overview-panel']) {
+            dom['overview-panel'].setAttribute('aria-hidden', String(active || !watchVisible));
+        }
+    }
+
     function applyPanelVisibility() {
         document.body.classList.toggle('hide-news', !state.panelVisibility.news);
         document.body.classList.toggle('hide-watch', !state.panelVisibility.watch);
         document.body.classList.toggle('hide-controls', !state.panelVisibility.controls);
+        applyLaunchDetailPanelState();
 
         ['news', 'watch', 'controls'].forEach((key) => {
             const button = dom['toggle-' + key];
             if (!button) return;
             button.setAttribute('aria-pressed', String(Boolean(state.panelVisibility[key])));
         });
+    }
+
+    function closeLaunchDetailPanel() {
+        state.launchDetailActive = false;
+        state.selectedLaunchId = null;
+        applyLaunchDetailPanelState();
+        refreshSelectedLaunchUi();
+    }
+
+    function satelliteOrbitRevolutionsLabel(value) {
+        return value === 1 ? '1 Umlauf' : `${value} Umlaeufe`;
+    }
+
+    function syncSatelliteOrbitSettingsUi() {
+        const value = clampSatelliteOrbitRevolutions(state.panelVisibility.orbitRevolutions);
+        state.panelVisibility.orbitRevolutions = value;
+        if (dom['satellite-orbit-revolutions']) {
+            dom['satellite-orbit-revolutions'].value = String(value);
+        }
+        if (dom['satellite-orbit-revolutions-readout']) {
+            dom['satellite-orbit-revolutions-readout'].textContent = satelliteOrbitRevolutionsLabel(value);
+        }
+    }
+
+    function onSatelliteOrbitRevolutionsInput() {
+        if (!dom['satellite-orbit-revolutions']) return;
+        state.panelVisibility.orbitRevolutions = clampSatelliteOrbitRevolutions(
+            dom['satellite-orbit-revolutions'].valueAsNumber
+        );
+        syncSatelliteOrbitSettingsUi();
+        writeUiState();
+        updateSatelliteOrbitPath(true);
     }
 
     function openSettings() {
@@ -491,6 +696,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         });
 
         dom['focus-next-launch']?.addEventListener('click', () => focusSelectedLaunch());
+        dom['mission-control-close']?.addEventListener('click', closeLaunchDetailPanel);
         dom['control-focus-launch']?.addEventListener('click', () => focusSelectedLaunch());
         dom['sat-focus-stop']?.addEventListener('click', stopSatelliteFollow);
         dom['sat-focus-stop-wide']?.addEventListener('click', stopSatelliteFollow);
@@ -509,6 +715,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         dom['jump-artemis-start']?.addEventListener('click', () => jumpToMissionMet(0));
         dom['jump-artemis-end']?.addEventListener('click', () => jumpToMissionMet(state.totalMissionHours));
         dom['follow-artemis']?.addEventListener('click', toggleFollowOrion);
+
+        dom['satellite-orbit-revolutions']?.addEventListener('input', onSatelliteOrbitRevolutionsInput);
 
         if (dom['zoom-slider']) {
             dom['zoom-slider'].addEventListener('pointerdown', () => { state.zoomSliderDragging = true; });
@@ -552,6 +760,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function init() {
         cacheDom();
         applyPanelVisibility();
+        syncSatelliteOrbitSettingsUi();
         initScene();
         bindUi();
         buildMissionTimeline();
@@ -661,6 +870,229 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         state.scene.add(new THREE.Points(geometry, material));
     }
 
+    function loadTextureCandidates(loader, urls, onLoad, onError = () => {}) {
+        const candidates = Array.isArray(urls) ? urls.filter(Boolean) : [urls].filter(Boolean);
+        let index = 0;
+        const tryNext = () => {
+            if (index >= candidates.length) {
+                onError();
+                return;
+            }
+            loader.load(candidates[index], onLoad, undefined, () => {
+                index += 1;
+                tryNext();
+            });
+        };
+        tryNext();
+    }
+
+    function prepareColorTexture(texture) {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        if (state.renderer?.capabilities) {
+            texture.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+        }
+        return texture;
+    }
+
+    function createFallbackEarthTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        const ocean = ctx.createLinearGradient(0, 0, 0, height);
+        ocean.addColorStop(0, '#123f7d');
+        ocean.addColorStop(0.46, '#1e6fa8');
+        ocean.addColorStop(0.54, '#227cb6');
+        ocean.addColorStop(1, '#10376d');
+        ctx.fillStyle = ocean;
+        ctx.fillRect(0, 0, width, height);
+
+        for (let y = 0; y < height; y += 1) {
+            const lat = 90 - (y / height) * 180;
+            const polar = Math.pow(Math.abs(lat) / 90, 2.2);
+            ctx.fillStyle = `rgba(255,255,255,${0.03 + polar * 0.11})`;
+            ctx.fillRect(0, y, width, 1);
+        }
+
+        const project = (lon, lat) => ({
+            x: ((lon + 180) / 360) * width,
+            y: ((90 - lat) / 180) * height
+        });
+        const drawLand = (points, fill, stroke = 'rgba(227, 222, 185, 0.24)') => {
+            ctx.beginPath();
+            points.forEach(([lon, lat], index) => {
+                const point = project(lon, lat);
+                if (index === 0) {
+                    ctx.moveTo(point.x, point.y);
+                } else {
+                    ctx.lineTo(point.x, point.y);
+                }
+            });
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        };
+
+        drawLand([[-168, 72], [-130, 72], [-98, 58], [-82, 46], [-64, 32], [-82, 18], [-103, 20], [-118, 32], [-125, 48], [-150, 58]], '#607b45');
+        drawLand([[-82, 13], [-70, 11], [-50, -4], [-40, -20], [-55, -54], [-72, -48], [-80, -20]], '#5c7740');
+        drawLand([[-18, 36], [10, 37], [38, 31], [51, 12], [43, -13], [30, -34], [12, -35], [-5, -14], [-16, 9]], '#8a7c45');
+        drawLand([[-10, 72], [38, 70], [95, 63], [142, 54], [164, 38], [122, 22], [96, 8], [72, 20], [46, 30], [16, 42], [-8, 50]], '#6e8146');
+        drawLand([[39, 31], [58, 28], [77, 18], [89, 8], [76, 5], [52, 13]], '#887640');
+        drawLand([[112, -10], [154, -18], [149, -39], [116, -44], [106, -28]], '#8b7542');
+        drawLand([[-52, 82], [-28, 76], [-20, 64], [-44, 58], [-62, 66]], '#d8dfdd');
+        drawLand([[-180, -64], [-90, -70], [0, -67], [90, -70], [180, -64], [180, -90], [-180, -90]], '#d9e0dd', 'rgba(255,255,255,0.35)');
+
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.3;
+        for (let i = 0; i < 48; i += 1) {
+            const y = 40 + Math.random() * (height - 80);
+            const x = Math.random() * width;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.bezierCurveTo(x + 28, y - 8, x + 62, y + 10, x + 100, y);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        const texture = new THREE.CanvasTexture(canvas);
+        return prepareColorTexture(texture);
+    }
+
+    function createFallbackEarthNightTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.fillStyle = '#02050a';
+        ctx.fillRect(0, 0, width, height);
+
+        const project = (lon, lat) => ({
+            x: ((lon + 180) / 360) * width,
+            y: ((90 - lat) / 180) * height
+        });
+        const drawLand = (points) => {
+            ctx.beginPath();
+            points.forEach(([lon, lat], index) => {
+                const point = project(lon, lat);
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(48, 88, 126, 0.28)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(116, 173, 218, 0.22)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        };
+
+        drawLand([[-168, 72], [-130, 72], [-98, 58], [-82, 46], [-64, 32], [-82, 18], [-103, 20], [-118, 32], [-125, 48], [-150, 58]]);
+        drawLand([[-82, 13], [-70, 11], [-50, -4], [-40, -20], [-55, -54], [-72, -48], [-80, -20]]);
+        drawLand([[-18, 36], [10, 37], [38, 31], [51, 12], [43, -13], [30, -34], [12, -35], [-5, -14], [-16, 9]]);
+        drawLand([[-10, 72], [38, 70], [95, 63], [142, 54], [164, 38], [122, 22], [96, 8], [72, 20], [46, 30], [16, 42], [-8, 50]]);
+        drawLand([[39, 31], [58, 28], [77, 18], [89, 8], [76, 5], [52, 13]]);
+        drawLand([[112, -10], [154, -18], [149, -39], [116, -44], [106, -28]]);
+        drawLand([[-52, 82], [-28, 76], [-20, 64], [-44, 58], [-62, 66]]);
+
+        const seedNoise = (value) => {
+            const s = Math.sin(value * 12.9898) * 43758.5453;
+            return s - Math.floor(s);
+        };
+        const drawLight = (lon, lat, size, alpha) => {
+            const point = project(lon, lat);
+            const radius = Math.max(1.6, size);
+            const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 3.2);
+            glow.addColorStop(0, `rgba(255, 230, 158, ${alpha})`);
+            glow.addColorStop(0.28, `rgba(255, 174, 78, ${alpha * 0.54})`);
+            glow.addColorStop(1, 'rgba(255, 166, 64, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius * 3.2, 0, Math.PI * 2);
+            ctx.fill();
+        };
+        const drawCluster = (lon, lat, count, spreadLon, spreadLat, size = 1.6) => {
+            for (let i = 0; i < count; i += 1) {
+                const lonOffset = (seedNoise(lon * 13 + lat * 7 + i) - 0.5) * spreadLon;
+                const latOffset = (seedNoise(lon * 5 - lat * 11 + i * 3) - 0.5) * spreadLat;
+                const alpha = 0.24 + seedNoise(lon + lat + i * 17) * 0.42;
+                drawLight(lon + lonOffset, lat + latOffset, size * (0.7 + seedNoise(i + lon) * 0.8), alpha);
+            }
+        };
+
+        [
+            [-74, 40, 34, 18, 11, 1.7],
+            [-95, 37, 30, 24, 12, 1.45],
+            [-122, 37, 18, 13, 10, 1.45],
+            [-46, -23, 22, 16, 10, 1.4],
+            [-58, -35, 14, 14, 8, 1.25],
+            [-3, 52, 38, 24, 11, 1.55],
+            [10, 49, 36, 24, 10, 1.5],
+            [30, 31, 18, 14, 9, 1.35],
+            [78, 22, 38, 28, 16, 1.45],
+            [116, 35, 42, 30, 15, 1.45],
+            [139, 36, 28, 14, 9, 1.55],
+            [127, 37, 18, 9, 6, 1.4],
+            [106, -6, 24, 17, 9, 1.35],
+            [151, -33, 14, 10, 7, 1.25],
+            [28, -26, 18, 14, 9, 1.35]
+        ].forEach(([lon, lat, count, spreadLon, spreadLat, size]) => {
+            drawCluster(lon, lat, count, spreadLon, spreadLat, size);
+        });
+
+        const texture = new THREE.CanvasTexture(canvas);
+        return prepareColorTexture(texture);
+    }
+
+    function applyEarthNightShader(material) {
+        const uniforms = {
+            earthNightSunDirection: { value: new THREE.Vector3(1, 0, 0) },
+            earthNightCityIntensity: { value: 0.62 },
+            earthNightSurfaceIntensity: { value: 0.08 }
+        };
+        state.earthNightUniforms = uniforms;
+
+        material.onBeforeCompile = (shader) => {
+            Object.assign(shader.uniforms, uniforms);
+            shader.vertexShader = shader.vertexShader
+                .replace(
+                    '#include <common>',
+                    '#include <common>\nvarying vec3 vEarthNightWorldNormal;'
+                )
+                .replace(
+                    '#include <beginnormal_vertex>',
+                    '#include <beginnormal_vertex>\nvEarthNightWorldNormal = normalize(mat3(modelMatrix) * objectNormal);'
+                );
+            shader.fragmentShader = shader.fragmentShader
+                .replace(
+                    '#include <common>',
+                    '#include <common>\nuniform vec3 earthNightSunDirection;\nuniform float earthNightCityIntensity;\nuniform float earthNightSurfaceIntensity;\nvarying vec3 vEarthNightWorldNormal;'
+                )
+                .replace(
+                    '#include <emissivemap_fragment>',
+                    [
+                        '#ifdef USE_EMISSIVEMAP',
+                        '    vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );',
+                        '    float sunFacing = dot(normalize(vEarthNightWorldNormal), normalize(earthNightSunDirection));',
+                        '    float nightMask = smoothstep(0.14, -0.22, sunFacing);',
+                        '    vec3 dimSurface = diffuseColor.rgb * earthNightSurfaceIntensity * nightMask;',
+                        '    vec3 cityLights = emissiveColor.rgb * earthNightCityIntensity * nightMask;',
+                        '    totalEmissiveRadiance += dimSurface + cityLights;',
+                        '#endif'
+                    ].join('\n')
+                );
+        };
+        material.customProgramCacheKey = () => 'earth-night-side-lights-v1';
+    }
+
     function createEarth() {
         state.earthGroup = new THREE.Group();
         state.earthGroup.rotation.z = OBLIQUITY_RAD;
@@ -671,29 +1103,37 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         const geometry = new THREE.SphereGeometry(ARTEMIS.EARTH_RADIUS, 128, 128);
         const material = new THREE.MeshPhongMaterial({
-            color: 0x4d8fcc,
+            map: createFallbackEarthTexture(),
+            color: 0xffffff,
+            emissiveMap: createFallbackEarthNightTexture(),
             emissive: 0x0b1422,
             emissiveIntensity: 0.08,
             specular: new THREE.Color(0x274969),
             shininess: 18
         });
-        loader.load(EARTH_TEX_URL, (texture) => {
-            texture.colorSpace = THREE.SRGBColorSpace;
+        applyEarthNightShader(material);
+        loadTextureCandidates(loader, EARTH_TEX_URLS, (texture) => {
+            prepareColorTexture(texture);
+            if (material.map && material.map !== texture) {
+                material.map.dispose();
+            }
             material.map = texture;
             material.color.set(0xffffff);
             material.needsUpdate = true;
         });
-        loader.load(EARTH_BUMP_TEX_URL, (texture) => {
+        loadTextureCandidates(loader, EARTH_BUMP_TEX_URLS, (texture) => {
             material.bumpMap = texture;
             material.bumpScale = 0.22;
             material.needsUpdate = true;
-        }, undefined, () => { /* optional */ });
-        loader.load(EARTH_NIGHT_TEX_URL, (texture) => {
-            texture.colorSpace = THREE.SRGBColorSpace;
+        });
+        loadTextureCandidates(loader, EARTH_NIGHT_TEX_URLS, (texture) => {
+            prepareColorTexture(texture);
+            if (material.emissiveMap && material.emissiveMap !== texture) {
+                material.emissiveMap.dispose();
+            }
             material.emissiveMap = texture;
-            material.emissiveIntensity = 0.12;
             material.needsUpdate = true;
-        }, undefined, () => { /* optional */ });
+        });
 
         state.earthMesh = new THREE.Mesh(geometry, material);
         state.earthMesh.userData.pickKind = 'planet';
@@ -709,13 +1149,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                 depthWrite: false
             })
         );
-        loader.load(EARTH_CLOUD_TEX_URL, (texture) => {
-            texture.colorSpace = THREE.SRGBColorSpace;
+        loadTextureCandidates(loader, EARTH_CLOUD_TEX_URLS, (texture) => {
+            prepareColorTexture(texture);
             state.earthCloudMesh.material.map = texture;
             state.earthCloudMesh.material.alphaMap = texture;
             state.earthCloudMesh.material.opacity = 0.34;
             state.earthCloudMesh.material.needsUpdate = true;
-        }, undefined, () => { /* optional */ });
+        });
         state.earthGroup.add(state.earthCloudMesh);
 
         state.earthAtmosphereMesh = new THREE.Mesh(
@@ -793,6 +1233,21 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         state.satelliteHighlight = createSatelliteHighlightMarker();
         state.satelliteHighlight.visible = false;
         state.earthMesh.add(state.satelliteHighlight);
+
+        state.satelliteOrbitLine = new THREE.Line(
+            new THREE.BufferGeometry(),
+            new THREE.LineDashedMaterial({
+                color: 0xffd36e,
+                dashSize: 0.55,
+                gapSize: 0.3,
+                transparent: true,
+                opacity: 0.78,
+                depthWrite: false
+            })
+        );
+        state.satelliteOrbitLine.frustumCulled = false;
+        state.satelliteOrbitLine.visible = false;
+        state.earthGroup.add(state.satelliteOrbitLine);
     }
 
     function createSatelliteHighlightTexture() {
@@ -1806,7 +2261,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     }
 
     function refreshSelectedLaunchUi() {
-        const launch = getSelectedLaunch();
+        const launch = state.selectedLaunchId || state.launchDetailActive ? getSelectedLaunch() : null;
         document.querySelectorAll('.launch-item[data-launch-id]').forEach((item) => {
             item.classList.toggle('active', item.dataset.launchId === state.selectedLaunchId);
         });
@@ -1815,6 +2270,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         });
         if (!launch) {
             updateLaunchStreamUi(null);
+            if (dom['watch-launch-title']) dom['watch-launch-title'].textContent = 'Ausgewaehlter Start';
+            if (dom['watch-launch-subtitle']) dom['watch-launch-subtitle'].textContent = '--';
+            if (dom['watch-launch-intel']) dom['watch-launch-intel'].textContent = 'Waehle rechts im Launch Feed einen Start aus.';
             return;
         }
 
@@ -1851,6 +2309,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function selectLaunch(launchId, focus) {
         state.selectedLaunchId = launchId;
+        state.launchDetailActive = true;
+        applyLaunchDetailPanelState();
         refreshSelectedLaunchUi();
         if (focus) focusSelectedLaunch();
     }
@@ -1899,8 +2359,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             state.launchDataGeneratedAt = payload?.generatedAt || '';
             state.launchDataSource = payload?.source || '';
             rememberLaunchesForMonitoring(state.launches);
-            if (!state.selectedLaunchId || !state.launches.some((launch) => launchKey(launch) === state.selectedLaunchId)) {
-                state.selectedLaunchId = state.launches[0] ? launchKey(state.launches[0]) : null;
+            const selectedStillAvailable = state.selectedLaunchId && (
+                state.launches.some((launch) => launchKey(launch) === state.selectedLaunchId) ||
+                state.launchWatchList.has(state.selectedLaunchId)
+            );
+            if (state.selectedLaunchId && !selectedStillAvailable) {
+                state.selectedLaunchId = null;
+                state.launchDetailActive = false;
+                applyLaunchDetailPanelState();
             }
 
             renderLaunchFeed(state.launches);
@@ -1913,6 +2379,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         } catch (error) {
             state.launches = [];
             rememberLaunchesForMonitoring([]);
+            state.selectedLaunchId = null;
+            state.launchDetailActive = false;
+            applyLaunchDetailPanelState();
             renderLaunchFeed([]);
             updateOverviewStats();
             rebuildLaunchMarkers();
@@ -2327,6 +2796,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                     periodMinutes: orbit.periodMinutes,
                     altitudeKm,
                     regime,
+                    orbitSource: 'TLE/SGP4',
                     color: [color.r, color.g, color.b]
                 });
             } catch (error) {
@@ -2396,6 +2866,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         }
         updateSatelliteFocusPanel(followedSatellite);
         updateSatelliteHighlight(performance.now());
+        updateSatelliteOrbitPath();
     }
 
     function updateSatelliteFocusPanel(satellite) {
@@ -2407,7 +2878,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         }
 
         setText('sat-focus-title', satellite.name);
-        setText('sat-focus-subtitle', `NORAD ${satellite.id}`);
+        setText('sat-focus-subtitle', `NORAD ${satellite.id}${satellite.orbitSource ? ` · ${satellite.orbitSource}` : ''}`);
         setText('sat-focus-type', satellite.type || '--');
         setText('sat-focus-operator', satellite.operator || '--');
         setText('sat-focus-country', satellite.country || '--');
@@ -2449,6 +2920,127 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             glow.scale.setScalar(glow.userData.baseScale || 1.5);
             glow.material.opacity = 0.72 + 0.18 * (0.5 + 0.5 * Math.sin(now * 0.008));
         }
+    }
+
+    function clearSatelliteOrbitPath() {
+        if (!state.satelliteOrbitLine) return;
+        state.satelliteOrbitLine.visible = false;
+        state.satelliteOrbitLastKey = '';
+    }
+
+    function localVectorToGeodetic(vector) {
+        const radius = vector.length();
+        if (radius <= 0) return null;
+        const latitude = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(vector.y / radius, -1, 1)));
+        const theta = Math.atan2(vector.z, -vector.x);
+        const longitude = THREE.MathUtils.euclideanModulo(THREE.MathUtils.radToDeg(theta) + 180, 360) - 180;
+        return {
+            latitude,
+            longitude,
+            altitudeKm: Math.max(0, (radius - ARTEMIS.EARTH_RADIUS) * 1000)
+        };
+    }
+
+    function satellitePositionAt(satellite, dateMs, satelliteLib = getSatelliteLib()) {
+        if (!satellite) return null;
+        const earthRotation = earthRotationAngleForMs(dateMs);
+
+        if (satellite.id === ISS_NORAD_ID && state.issOemLoaded) {
+            const inertialPosition = interpolateIssOemPosition(dateMs);
+            if (inertialPosition) {
+                const localPosition = inertialPosition.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -earthRotation);
+                const geodetic = localVectorToGeodetic(localPosition);
+                return {
+                    localPosition,
+                    inertialPosition,
+                    latitude: geodetic?.latitude ?? NaN,
+                    longitude: geodetic?.longitude ?? NaN,
+                    altitudeKm: geodetic?.altitudeKm ?? NaN,
+                    source: 'NASA ISS OEM'
+                };
+            }
+        }
+
+        if (!satelliteLib || !satellite.satrec) return null;
+        const sampleDate = new Date(dateMs);
+        let geodetic;
+        try {
+            const propagated = satelliteLib.propagate(satellite.satrec, sampleDate);
+            const eciPosition = propagated?.position;
+            if (!eciPosition ||
+                !Number.isFinite(eciPosition.x) ||
+                !Number.isFinite(eciPosition.y) ||
+                !Number.isFinite(eciPosition.z)) {
+                return null;
+            }
+            geodetic = satelliteLib.eciToGeodetic(eciPosition, satelliteLib.gstime(sampleDate));
+        } catch (error) {
+            return null;
+        }
+
+        const latitude = satelliteLib.degreesLat(geodetic.latitude);
+        const longitude = satelliteLib.degreesLong(geodetic.longitude);
+        const altitudeKm = Math.max(0, geodetic.height);
+        const localPosition = latLonToVector3(latitude, longitude, ARTEMIS.EARTH_RADIUS + altitudeKm / 1000);
+        const inertialPosition = localPosition.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), earthRotation);
+        return {
+            localPosition,
+            inertialPosition,
+            latitude,
+            longitude,
+            altitudeKm,
+            source: 'TLE/SGP4'
+        };
+    }
+
+    function updateSatelliteOrbitPath(force = false) {
+        if (!state.satelliteOrbitLine) return;
+        const satellite = state.followSatelliteId
+            ? state.satelliteIndex.get(state.followSatelliteId)
+            : null;
+        const satelliteLib = getSatelliteLib();
+        if (!satellite || !satelliteLib || !satellite.satrec || !state.earthGroup) {
+            clearSatelliteOrbitPath();
+            return;
+        }
+
+        const referenceMs = earthReferenceTimeMs();
+        const periodMinutes = THREE.MathUtils.clamp(
+            Number.isFinite(satellite.periodMinutes) ? satellite.periodMinutes : 96,
+            80,
+            4320
+        );
+        const key = [
+            satellite.id,
+            Math.floor(referenceMs / SATELLITE_ORBIT_REFRESH_MS),
+            Math.round(periodMinutes * 10),
+            clampSatelliteOrbitRevolutions(state.panelVisibility.orbitRevolutions),
+            satellite.id === ISS_NORAD_ID && state.issOemLoaded ? 'iss-oem' : 'tle'
+        ].join(':');
+        if (!force && state.satelliteOrbitLastKey === key) {
+            return;
+        }
+
+        const points = [];
+        const orbitRevolutions = clampSatelliteOrbitRevolutions(state.panelVisibility.orbitRevolutions);
+        const totalSampleCount = SATELLITE_ORBIT_SAMPLE_COUNT * orbitRevolutions;
+        const stepMs = (periodMinutes * 60000) / SATELLITE_ORBIT_SAMPLE_COUNT;
+        for (let i = 0; i <= totalSampleCount; i += 1) {
+            const sampleMs = referenceMs + i * stepMs;
+            const sample = satellitePositionAt(satellite, sampleMs, satelliteLib);
+            if (sample?.inertialPosition) points.push(sample.inertialPosition);
+        }
+
+        if (points.length < 2) {
+            clearSatelliteOrbitPath();
+            return;
+        }
+
+        state.satelliteOrbitLine.geometry.dispose();
+        state.satelliteOrbitLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
+        state.satelliteOrbitLine.computeLineDistances();
+        state.satelliteOrbitLine.visible = true;
+        state.satelliteOrbitLastKey = key;
     }
 
     function frameFollowedSatellite(worldPosition, satellite) {
@@ -2493,30 +3085,22 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         const geometry = state.satellitePoints.geometry;
         const positionAttr = geometry.getAttribute('position');
-        const referenceDate = new Date(referenceMs);
-        const referenceAngle = satelliteLib.gstime(referenceDate);
         let visibleCount = 0;
         state.satelliteWorldPositions.clear();
         state.satelliteDrawOrder = [];
 
         state.satelliteCatalog.forEach((satellite) => {
-            const propagated = satelliteLib.propagate(satellite.satrec, referenceDate);
-            const eciPosition = propagated?.position;
-            if (!eciPosition || !Number.isFinite(eciPosition.x) || !Number.isFinite(eciPosition.y) || !Number.isFinite(eciPosition.z)) {
-                return;
-            }
+            const propagated = satellitePositionAt(satellite, referenceMs, satelliteLib);
+            if (!propagated?.localPosition) return;
 
-            const geodetic = satelliteLib.eciToGeodetic(eciPosition, referenceAngle);
-            const latitude = satelliteLib.degreesLat(geodetic.latitude);
-            const longitude = satelliteLib.degreesLong(geodetic.longitude);
-            const altitudeKm = Math.max(0, geodetic.height);
-            satellite.altitudeKm = altitudeKm;
-            satellite.latitudeDeg = latitude;
-            satellite.longitudeDeg = longitude;
+            satellite.altitudeKm = propagated.altitudeKm;
+            satellite.latitudeDeg = propagated.latitude;
+            satellite.longitudeDeg = propagated.longitude;
+            satellite.orbitSource = propagated.source;
             if (!orbitRegimeActive(satellite.regime)) {
                 return;
             }
-            const vector = latLonToVector3(latitude, longitude, ARTEMIS.EARTH_RADIUS + altitudeKm / 1000);
+            const vector = propagated.localPosition;
 
             positionAttr.setXYZ(visibleCount, vector.x, vector.y, vector.z);
             state.satelliteWorldPositions.set(satellite.id, vector.clone());
@@ -2586,6 +3170,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     async function initSatelliteTracking() {
         updateSatelliteStats();
         await ensureSatelliteLibrary();
+        loadIssOemData();
         fetchSatelliteCatalog();
         if (state.satelliteFetchTimer) clearInterval(state.satelliteFetchTimer);
         state.satelliteFetchTimer = setInterval(fetchSatelliteCatalog, SATELLITE_FETCH_INTERVAL_MS);
@@ -3164,6 +3749,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const sunDirection = state.sunScenePos.clone().normalize();
         state.sunDirLight.position.copy(sunDirection.clone().multiplyScalar(500));
         state.fillDirLight.position.copy(sunDirection.clone().multiplyScalar(-250));
+        if (state.earthNightUniforms) {
+            state.earthNightUniforms.earthNightSunDirection.value.copy(sunDirection);
+        }
 
         Object.keys(state.planetMeshes).forEach((key) => {
             const index = Number(key);
@@ -3201,8 +3789,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         line.computeLineDistances();
     }
 
-    function updateEarthRotation(dateMs) {
-        if (!state.earthMesh || !state.earthGroup) return;
+    function earthRotationAngleForMs(dateMs) {
         const jd = (dateMs / 86400000) + 2440587.5;
         const T = (jd - 2451545.0) / 36525;
         const gmstDeg =
@@ -3212,10 +3799,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             (T * T * T) / 38710000;
         // Greenwich starts on the texture's +X meridian, while the J2000
         // reference direction in this display frame points along -Z.
-        state.earthRotationAngle = THREE.MathUtils.euclideanModulo(
+        return THREE.MathUtils.euclideanModulo(
             EARTH_SIDEREAL_REFERENCE_OFFSET_RAD - THREE.MathUtils.degToRad(gmstDeg),
             Math.PI * 2
         );
+    }
+
+    function updateEarthRotation(dateMs) {
+        if (!state.earthMesh || !state.earthGroup) return;
+        state.earthRotationAngle = earthRotationAngleForMs(dateMs);
         state.earthMesh.rotation.y = state.earthRotationAngle;
         if (state.earthCloudMesh) {
             state.earthCloudMesh.rotation.y = state.earthRotationAngle * 1.025;

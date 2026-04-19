@@ -217,13 +217,26 @@ body::after {
     border-radius: 999px;
 }
 
-#overview-panel {
+#overview-panel,
+#mission-control-panel {
     top: 116px;
     left: 20px;
     width: min(320px, calc(100vw - 40px));
     max-height: calc(100vh - 136px);
     overflow: auto;
     padding: 14px;
+}
+
+#mission-control-panel {
+    display: none;
+}
+
+body.launch-detail-active:not(.hide-watch) #overview-panel {
+    display: none;
+}
+
+body.launch-detail-active:not(.hide-watch) #mission-control-panel {
+    display: block;
 }
 
 #launch-feed-panel {
@@ -371,6 +384,10 @@ body.satellite-following .panel-restore-right {
     font-weight: 600;
 }
 
+#mission-control-panel .status-pill {
+    margin-top: 14px;
+}
+
 .status-pill.status-live {
     color: var(--teal);
 }
@@ -461,6 +478,13 @@ body.satellite-following .panel-restore-right {
     margin-top: 14px;
     padding-top: 12px;
     border-top: 1px solid var(--line);
+}
+
+#mission-control-panel .launch-stream {
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(10, 18, 34, 0.82);
 }
 
 .launch-stream.is-hidden {
@@ -656,7 +680,8 @@ body.satellite-following .panel-restore-right {
 }
 
 .zoom-row input,
-.mission-slider-wrap input {
+.mission-slider-wrap input,
+.orbit-setting-wrap input {
     flex: 1;
     min-width: 120px;
     accent-color: var(--cyan);
@@ -664,7 +689,8 @@ body.satellite-following .panel-restore-right {
 
 #zoom-readout,
 #warp-display,
-#mission-met-readout {
+#mission-met-readout,
+#satellite-orbit-revolutions-readout {
     color: #ffffff;
     font-family: "Consolas", "Courier New", monospace;
     font-weight: 700;
@@ -713,6 +739,7 @@ body.satellite-following .panel-restore-right {
 }
 
 #overview-panel,
+#mission-control-panel,
 #launch-feed-items,
 .mission-timeline,
 #satellite-search-results,
@@ -723,6 +750,7 @@ body.satellite-following .panel-restore-right {
 }
 
 #overview-panel::-webkit-scrollbar,
+#mission-control-panel::-webkit-scrollbar,
 #launch-feed-items::-webkit-scrollbar,
 .mission-timeline::-webkit-scrollbar,
 #satellite-search-results::-webkit-scrollbar,
@@ -732,6 +760,7 @@ body.satellite-following .panel-restore-right {
 }
 
 #overview-panel::-webkit-scrollbar-track,
+#mission-control-panel::-webkit-scrollbar-track,
 #launch-feed-items::-webkit-scrollbar-track,
 .mission-timeline::-webkit-scrollbar-track,
 #satellite-search-results::-webkit-scrollbar-track,
@@ -741,6 +770,7 @@ body.satellite-following .panel-restore-right {
 }
 
 #overview-panel::-webkit-scrollbar-thumb,
+#mission-control-panel::-webkit-scrollbar-thumb,
 #launch-feed-items::-webkit-scrollbar-thumb,
 .mission-timeline::-webkit-scrollbar-thumb,
 #satellite-search-results::-webkit-scrollbar-thumb,
@@ -979,7 +1009,8 @@ body.satellite-following .panel-restore-right {
     color: #dfe5f5;
 }
 
-.mission-slider-wrap {
+.mission-slider-wrap,
+.orbit-setting-wrap {
     margin-top: 14px;
     padding: 12px;
     border-radius: 16px;
@@ -1079,6 +1110,7 @@ body.satellite-following .panel-restore-right {
 
 body.hide-news #launch-feed-panel,
 body.hide-watch #overview-panel,
+body.hide-watch #mission-control-panel,
 body.hide-controls #controls-panel {
     display: none;
 }
@@ -1094,7 +1126,8 @@ body.hide-controls .panel-restore-bottom {
 }
 
 @media (max-width: 1260px) {
-    #overview-panel {
+    #overview-panel,
+    #mission-control-panel {
         width: min(286px, calc(100vw - 40px));
     }
 
@@ -1111,6 +1144,7 @@ body.hide-controls .panel-restore-bottom {
 
     #topbar,
     #overview-panel,
+    #mission-control-panel,
     #launch-feed-panel,
     #satellite-focus-panel,
     #controls-panel,
@@ -1146,6 +1180,14 @@ body.hide-controls .panel-restore-bottom {
     #launch-feed-panel {
         height: auto;
         min-height: 0;
+    }
+
+    #mission-control-panel {
+        display: none;
+    }
+
+    body.launch-detail-active:not(.hide-watch) #mission-control-panel {
+        display: block;
     }
 
     #satellite-focus-panel {

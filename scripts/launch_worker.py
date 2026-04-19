@@ -25,11 +25,13 @@ DB_PATH = DATA_DIR / "launch-db.json"
 STATS_PATH = DATA_DIR / "launch-stats.json"
 STATE_PATH = DATA_DIR / "worker-state.json"
 SATELLITE_TLE_PATH = DATA_DIR / "active-satellites.tle"
+ISS_OEM_PATH = DATA_DIR / "iss-oem-j2k.txt"
 
 LL_BASE = "https://ll.thespacedevs.com/2.2.0"
 UPCOMING_URL = f"{LL_BASE}/launch/upcoming/?limit=48&mode=detailed"
 PREVIOUS_URL = f"{LL_BASE}/launch/previous/?limit={{limit}}&mode=detailed"
 SATELLITE_SOURCE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
+ISS_OEM_SOURCE_URL = "https://nasa-public-data.s3.amazonaws.com/iss-coords/current/ISS_OEM/ISS.OEM_J2K_EPH.txt"
 
 USER_AGENT = os.environ.get(
     "LAUNCH_WORKER_USER_AGENT",
@@ -38,6 +40,7 @@ USER_AGENT = os.environ.get(
 
 FEED_REFRESH_INTERVAL = timedelta(hours=1)
 SATELLITE_REFRESH_INTERVAL = timedelta(hours=2)
+ISS_OEM_REFRESH_INTERVAL = timedelta(hours=2)
 PREFLIGHT_WINDOW = timedelta(minutes=15)
 POSTFLIGHT_DELAY = timedelta(minutes=30)
 DETAIL_RECHECK_INTERVAL = timedelta(minutes=30)
@@ -73,6 +76,7 @@ EMPTY_STATE = {
     "lastFeedRefreshAt": None,
     "lastCheckRunAt": None,
     "lastSatelliteRefreshAt": None,
+    "lastIssOemRefreshAt": None,
     "pendingChecks": [],
     "lastErrors": [],
 }
@@ -586,10 +590,26 @@ def refresh_satellites(now: datetime, state: dict, force: bool, errors: list[str
         return False
 
 
+def refresh_iss_oem(now: datetime, state: dict, force: bool, errors: list[str]) -> bool:
+    if not should_refresh(state.get("lastIssOemRefreshAt"), ISS_OEM_REFRESH_INTERVAL, now, force) and ISS_OEM_PATH.exists():
+        return False
+    try:
+        text = request_text(ISS_OEM_SOURCE_URL)
+        if not text.strip() or "META_START" not in text:
+            raise RuntimeError("NASA ISS OEM returned an unexpected payload")
+        changed = write_text_if_changed(ISS_OEM_PATH, text)
+        state["lastIssOemRefreshAt"] = to_iso(now)
+        return changed
+    except Exception as error:  # noqa: BLE001
+        errors.append(f"ISS OEM refresh failed: {error}")
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh static launch data for GitHub Pages.")
     parser.add_argument("--force-feed", action="store_true", help="Refresh launch-feed.json even inside the hourly guard.")
     parser.add_argument("--force-satellites", action="store_true", help="Refresh active-satellites.tle even inside the two-hour guard.")
+    parser.add_argument("--force-iss-oem", action="store_true", help="Refresh NASA ISS OEM ephemeris even inside the two-hour guard.")
     parser.add_argument("--seed-history", action="store_true", help="Backfill launch-db.json from Launch Library previous launches.")
     parser.add_argument("--seed-limit", type=int, default=int(os.environ.get("SEED_HISTORY_LIMIT", "100")))
     parser.add_argument("--max-detail-checks", type=int, default=int(os.environ.get("MAX_DETAIL_CHECKS", "8")))
@@ -639,6 +659,7 @@ def main() -> int:
 
     stats_payload = compute_stats(launches, now, os.environ.get("STATS_TIMEZONE", "Europe/Berlin"))
     satellite_changed = refresh_satellites(now, state, args.force_satellites, errors)
+    iss_oem_changed = refresh_iss_oem(now, state, args.force_iss_oem, errors)
 
     state["lastCheckRunAt"] = to_iso(now)
     state["pendingChecks"] = pending_checks(launches, now)
@@ -655,6 +676,8 @@ def main() -> int:
             changed_paths.append(str(path.relative_to(REPO_ROOT)))
     if satellite_changed:
         changed_paths.append(str(SATELLITE_TLE_PATH.relative_to(REPO_ROOT)))
+    if iss_oem_changed:
+        changed_paths.append(str(ISS_OEM_PATH.relative_to(REPO_ROOT)))
 
     print(
         json.dumps(

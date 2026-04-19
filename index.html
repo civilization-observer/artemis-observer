@@ -26,11 +26,11 @@
     <aside class="panel" id="overview-panel">
         <div class="panel-head">
             <div>
-                <div class="section-kicker">Launch Watch</div>
-                <h3 id="watch-launch-title">Ausgewaehlter Start</h3>
-                <div class="watch-subtitle" id="watch-launch-subtitle">--</div>
+                <div class="section-kicker">Overview</div>
+                <h3>Startseite</h3>
+                <div class="watch-subtitle">Launches & Satelliten</div>
             </div>
-            <button type="button" class="panel-arrow" data-ui-toggle="watch" aria-label="Launch Watch ein- oder ausblenden">&#8249;</button>
+            <button type="button" class="panel-arrow" data-ui-toggle="watch" aria-label="Uebersicht ein- oder ausblenden">&#8249;</button>
         </div>
 
         <div class="stats-grid">
@@ -74,56 +74,66 @@
                 <strong id="sat-stat-live">--</strong>
             </div>
         </div>
+    </aside>
 
-        <div class="hero-launch-card">
-            <div class="status-pill" id="scene-mode-pill">Home-Modus: Earth Launch Tracker</div>
-            <div class="hero-launch-meta">
-                <div class="meta-block">
-                    <div class="small-label">Status</div>
-                    <strong id="watch-launch-status">--</strong>
+    <aside class="panel" id="mission-control-panel" aria-hidden="true">
+        <div class="panel-head">
+            <div>
+                <div class="section-kicker">Mission Control</div>
+                <h3 id="watch-launch-title">Ausgewaehlter Start</h3>
+                <div class="watch-subtitle" id="watch-launch-subtitle">--</div>
+            </div>
+            <button type="button" class="panel-arrow" id="mission-control-close" aria-label="Mission Control schliessen">&times;</button>
+        </div>
+
+        <div class="launch-stream is-hidden" id="watch-launch-stream">
+            <div class="small-label">LiveStream</div>
+            <p id="watch-launch-stream-state">Streamsuche wartet auf T-15.</p>
+            <iframe id="watch-launch-stream-frame" class="launch-stream-frame is-hidden" title="Launch Livestream" src="about:blank" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+            <a id="watch-launch-stream-link" class="watch-link is-hidden" href="#" target="_blank" rel="noreferrer noopener">Livestream oeffnen</a>
+        </div>
+
+        <div class="status-pill" id="scene-mode-pill">Home-Modus: Earth Launch Tracker</div>
+        <div class="hero-launch-meta">
+            <div class="meta-block">
+                <div class="small-label">Status</div>
+                <strong id="watch-launch-status">--</strong>
+            </div>
+            <div class="meta-block">
+                <div class="small-label">Countdown</div>
+                <strong id="watch-launch-countdown">--</strong>
+            </div>
+            <div class="meta-block">
+                <div class="small-label">Startfenster</div>
+                <strong id="watch-launch-window">--</strong>
+            </div>
+            <div class="meta-block">
+                <div class="small-label">Pad</div>
+                <strong id="watch-launch-pad">--</strong>
+            </div>
+            <div class="meta-block">
+                <div class="small-label">Koordinaten</div>
+                <strong id="watch-launch-coords">--</strong>
+            </div>
+        </div>
+        <div class="hero-action-row">
+            <button type="button" class="action-btn action-btn-accent" id="focus-next-launch">Zum Startplatz</button>
+        </div>
+        <div class="watch-intel" id="watch-launch-intel">Monitoring wartet auf Startdaten.</div>
+        <div class="watch-story">
+            <div class="small-label">Mission</div>
+            <p id="watch-launch-story">Sobald Launch-Daten geladen sind, erscheint hier die Missionsbeschreibung oder ein kurzer Kontext zum Flug.</p>
+            <div class="watch-story-grid">
+                <div>
+                    <div class="small-label">Firma</div>
+                    <strong id="watch-launch-provider">--</strong>
                 </div>
-                <div class="meta-block">
-                    <div class="small-label">Countdown</div>
-                    <strong id="watch-launch-countdown">--</strong>
-                </div>
-                <div class="meta-block">
-                    <div class="small-label">Startfenster</div>
-                    <strong id="watch-launch-window">--</strong>
-                </div>
-                <div class="meta-block">
-                    <div class="small-label">Pad</div>
-                    <strong id="watch-launch-pad">--</strong>
-                </div>
-                <div class="meta-block">
-                    <div class="small-label">Koordinaten</div>
-                    <strong id="watch-launch-coords">--</strong>
+                <div>
+                    <div class="small-label">Rakete</div>
+                    <strong id="watch-launch-rocket">--</strong>
                 </div>
             </div>
-            <div class="hero-action-row">
-                <button type="button" class="action-btn action-btn-accent" id="focus-next-launch">Zum Startplatz</button>
-            </div>
-            <div class="watch-intel" id="watch-launch-intel">Monitoring wartet auf Startdaten.</div>
-            <div class="watch-story">
-                <div class="small-label">Mission</div>
-                <p id="watch-launch-story">Sobald Launch-Daten geladen sind, erscheint hier die Missionsbeschreibung oder ein kurzer Kontext zum Flug.</p>
-                <div class="watch-story-grid">
-                    <div>
-                        <div class="small-label">Firma</div>
-                        <strong id="watch-launch-provider">--</strong>
-                    </div>
-                    <div>
-                        <div class="small-label">Rakete</div>
-                        <strong id="watch-launch-rocket">--</strong>
-                    </div>
-                </div>
-                <a id="watch-launch-link" class="watch-link is-hidden" href="#" target="_blank" rel="noreferrer noopener">Externe Quelle oeffnen</a>
-            </div>
-            <div class="launch-stream is-hidden" id="watch-launch-stream">
-                <div class="small-label">LiveStream</div>
-                <p id="watch-launch-stream-state">Streamsuche wartet auf T-15.</p>
-                <iframe id="watch-launch-stream-frame" class="launch-stream-frame is-hidden" title="Launch Livestream" src="about:blank" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-                <a id="watch-launch-stream-link" class="watch-link is-hidden" href="#" target="_blank" rel="noreferrer noopener">Livestream oeffnen</a>
-            </div>
+            <a id="watch-launch-link" class="watch-link is-hidden" href="#" target="_blank" rel="noreferrer noopener">Externe Quelle oeffnen</a>
         </div>
     </aside>
 
@@ -243,7 +253,7 @@
         </div>
     </section>
 
-    <button type="button" class="panel-restore-tab panel-restore-left" id="panel-restore-watch" data-ui-toggle="watch" aria-label="Launch Watch einblenden">Watch</button>
+    <button type="button" class="panel-restore-tab panel-restore-left" id="panel-restore-watch" data-ui-toggle="watch" aria-label="Uebersicht einblenden">Info</button>
     <button type="button" class="panel-restore-tab panel-restore-right" id="panel-restore-news" data-ui-toggle="news" aria-label="Launch Feed einblenden">Feed</button>
     <button type="button" class="panel-restore-tab panel-restore-bottom" id="panel-restore-controls" data-ui-toggle="controls" aria-label="Steuerung einblenden">Steuerung</button>
 
@@ -274,6 +284,18 @@
         </section>
 
         <section class="drawer-section">
+            <h3>Satelliten-Tracking</h3>
+            <p>Lege fest, wie weit die vorausberechnete Flugbahn fuer den verfolgten Satelliten angezeigt wird.</p>
+            <div class="orbit-setting-wrap">
+                <div class="mission-slider-head">
+                    <span class="small-label">Flugbahn-Laenge</span>
+                    <span id="satellite-orbit-revolutions-readout">2 Umlaeufe</span>
+                </div>
+                <input type="range" id="satellite-orbit-revolutions" min="1" max="5" value="2" step="1">
+            </div>
+        </section>
+
+        <section class="drawer-section">
             <div class="panel-head">
                 <div>
                     <h3>Ergebnisse</h3>
@@ -299,7 +321,7 @@
             <p>Steuere die Zusatzpanels, ohne die Startseite wieder mit Artemis-spezifischen Modulen zu ueberfrachten.</p>
             <div class="toggle-row">
                 <button type="button" class="toggle-chip" id="toggle-news" data-ui-toggle="news" aria-pressed="true">Feed</button>
-                <button type="button" class="toggle-chip" id="toggle-watch" data-ui-toggle="watch" aria-pressed="true">Launch Watch</button>
+                <button type="button" class="toggle-chip" id="toggle-watch" data-ui-toggle="watch" aria-pressed="true">Uebersicht</button>
                 <button type="button" class="toggle-chip" id="toggle-controls" data-ui-toggle="controls" aria-pressed="true">Steuerung</button>
             </div>
         </section>
