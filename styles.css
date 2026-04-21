@@ -1142,7 +1142,7 @@ body.hide-controls .panel-restore-bottom {
     }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 960px), (hover: none) and (pointer: coarse) {
     body {
         overflow: auto;
     }
@@ -1242,7 +1242,7 @@ body.hide-controls .panel-restore-bottom {
     }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 960px), (hover: none) and (pointer: coarse) {
     html,
     body {
         height: 100%;

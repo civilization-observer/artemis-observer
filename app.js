@@ -307,7 +307,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function isMobileViewport() {
         return typeof window.matchMedia === 'function' &&
-            window.matchMedia('(max-width: 960px)').matches;
+            window.matchMedia('(max-width: 960px), (hover: none) and (pointer: coarse)').matches;
     }
 
     function clampSatelliteOrbitRevolutions(value) {
