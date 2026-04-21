@@ -18,6 +18,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const LAUNCH_SUCCESS_CHECK_DELAY_MS = 30 * 60 * 1000;
     const LAUNCH_DATA_REFRESH_MS = 15 * 60 * 1000;
     const SATELLITE_TLE_URL = 'data/active-satellites.tle';
+    const SATELLITE_PROFILE_API_URL = '/api/satellites/profile';
+    const SATELLITE_PROFILE_CACHE_VERSION = 'v2';
+    const CELESTRAK_SATCAT_RECORDS_URL = 'https://celestrak.org/satcat/records.php';
+    const WIKIDATA_SPARQL_URL = 'https://query.wikidata.org/sparql';
     const ISS_OEM_URL = 'data/iss-oem-j2k.txt';
     const ISS_NORAD_ID = '25544';
     const SATELLITE_LIB_CANDIDATES = [
@@ -208,6 +212,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         observerWatchId: null,
         satellitePoints: null,
         satelliteHighlight: null,
+        satelliteFocusedModelKey: '',
         satelliteOrbitLine: null,
         satelliteOrbitLastKey: '',
         satelliteCatalog: [],
@@ -216,6 +221,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         satelliteLibraryReady: false,
         satelliteLastError: '',
         satelliteLiveCount: 0,
+        satelliteProfileCache: new Map(),
+        satelliteProfilePending: new Map(),
         satelliteSearchQuery: '',
         satelliteFilters: { LEO: true, MEO: true, GEO: true, HEO: true },
         satelliteWorldPositions: new Map(),
@@ -505,6 +512,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'sat-focus-operator',
             'sat-focus-country',
             'sat-focus-profile-source',
+            'sat-focus-size',
             'sat-focus-regime',
             'sat-focus-altitude',
             'sat-focus-perigee',
@@ -1250,71 +1258,231 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         state.earthGroup.add(state.satelliteOrbitLine);
     }
 
-    function createSatelliteHighlightTexture() {
+    function createSatelliteHighlightMarker() {
+        const group = new THREE.Group();
+        const focusRing = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: createSatelliteFocusRingTexture(),
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.88,
+            depthWrite: false,
+            depthTest: false
+        }));
+        focusRing.userData.baseScale = 1.65;
+        focusRing.frustumCulled = false;
+
+        const focusLight = new THREE.PointLight(0x9feaff, 1.8, 4.5, 1.8);
+        focusLight.position.set(0, 0.65, 0.55);
+
+        group.add(focusRing, focusLight);
+        group.userData.focusRing = focusRing;
+        group.userData.focusLight = focusLight;
+        group.userData.modelRoot = new THREE.Group();
+        group.userData.modelRoot.visible = false;
+        group.add(group.userData.modelRoot);
+        group.frustumCulled = false;
+        return group;
+    }
+
+    function createSatelliteFocusRingTexture() {
         const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
+        canvas.width = 160;
+        canvas.height = 160;
         const ctx = canvas.getContext('2d');
-        const cx = 64;
-        const cy = 64;
-        const gradient = ctx.createRadialGradient(cx, cy, 2, cx, cy, 58);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.16, 'rgba(255, 229, 139, 0.95)');
-        gradient.addColorStop(0.42, 'rgba(95, 216, 255, 0.38)');
-        gradient.addColorStop(0.72, 'rgba(95, 216, 255, 0.13)');
-        gradient.addColorStop(1, 'rgba(95, 216, 255, 0)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = 'rgba(255, 231, 154, 0.86)';
-        ctx.lineWidth = 2.5;
+        const cx = 80;
+        const cy = 80;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(126, 231, 255, 0.92)';
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 52, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.lineWidth = 1.2;
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.82)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(cx - 44, cy);
-        ctx.lineTo(cx - 20, cy);
-        ctx.moveTo(cx + 20, cy);
-        ctx.lineTo(cx + 44, cy);
-        ctx.moveTo(cx, cy - 44);
-        ctx.lineTo(cx, cy - 20);
-        ctx.moveTo(cx, cy + 20);
-        ctx.lineTo(cx, cy + 44);
+        ctx.moveTo(cx - 68, cy);
+        ctx.lineTo(cx - 55, cy);
+        ctx.moveTo(cx + 55, cy);
+        ctx.lineTo(cx + 68, cy);
+        ctx.moveTo(cx, cy - 68);
+        ctx.lineTo(cx, cy - 55);
+        ctx.moveTo(cx, cy + 55);
+        ctx.lineTo(cx, cy + 68);
         ctx.stroke();
+
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         return texture;
     }
 
-    function createSatelliteHighlightMarker() {
-        const group = new THREE.Group();
-        const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: createSatelliteHighlightTexture(),
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.95,
-            depthWrite: false
-        }));
-        glow.userData.baseScale = 1.55;
-        glow.frustumCulled = false;
+    function modelMaterial(color, options = {}) {
+        return new THREE.MeshStandardMaterial({
+            color,
+            roughness: options.roughness ?? 0.55,
+            metalness: options.metalness ?? 0.35,
+            emissive: options.emissive ?? 0x000000,
+            emissiveIntensity: options.emissiveIntensity ?? 0
+        });
+    }
 
-        const core = new THREE.Mesh(
-            new THREE.SphereGeometry(0.08, 16, 16),
-            new THREE.MeshBasicMaterial({
-                color: 0xfff2a8,
-                transparent: true,
-                opacity: 0.98,
-                depthWrite: false
-            })
+    function addBox(parent, size, position, material) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
+        mesh.position.set(position[0], position[1], position[2]);
+        parent.add(mesh);
+        return mesh;
+    }
+
+    function addCylinder(parent, radiusTop, radiusBottom, height, position, material, radialSegments = 24) {
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments), material);
+        mesh.position.set(position[0], position[1], position[2]);
+        parent.add(mesh);
+        return mesh;
+    }
+
+    function addDish(parent, position, rotation, material) {
+        const dish = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.18, 0.06, 0.08, 32),
+            material
         );
-        core.frustumCulled = false;
+        dish.position.set(position[0], position[1], position[2]);
+        dish.rotation.set(rotation[0], rotation[1], rotation[2]);
+        parent.add(dish);
+        return dish;
+    }
 
-        group.add(glow, core);
-        group.userData.glow = glow;
-        group.userData.core = core;
-        group.frustumCulled = false;
+    function addSolarPanel(parent, size, position, material, frameMaterial) {
+        const panel = addBox(parent, size, position, material);
+        addBox(parent, [size[0] + 0.035, size[1] + 0.035, size[2] * 0.7], position, frameMaterial);
+        panel.renderOrder = 2;
+        return panel;
+    }
+
+    function satelliteModelFamily(satellite) {
+        const n = String(satellite?.name || '').toUpperCase();
+        const type = String(satellite?.type || '').toUpperCase();
+        if (/^STARLINK\b/.test(n)) return /V2|V2 MINI/.test(n) ? 'starlink-v2' : 'starlink';
+        if (/^ONEWEB\b/.test(n)) return 'oneweb';
+        if (/^GLOBALSTAR\b/.test(n)) return 'globalstar';
+        if (/^IRIDIUM\b/.test(n)) return 'iridium';
+        if (/^LEMUR\b|^FLOCK\b|^DOVE\b/.test(n) || /CUBESAT/.test(formatSatelliteSize(satellite).toUpperCase())) return 'cubesat';
+        if (/^SENTINEL-1\b|^CAPELLA\b|^ICEYE\b/.test(n) || /SAR|RADAR/.test(type)) return 'radar';
+        if (/GPS|NAVSTAR|GALILEO|GLONASS|BEIDOU|QZSS|MICHIBIKI/.test(n) || /NAVIGATION/.test(type)) return 'navigation';
+        if (/GEO|COMMUNICATION|KOMMUNIKATION|RELAIS|TDRS|O3B|SES|EUTELSAT|INTELSAT|INMARSAT/.test(`${n} ${type}`)) return 'comms';
+        return 'generic';
+    }
+
+    function buildSatelliteModel(satellite) {
+        const family = satelliteModelFamily(satellite);
+        const group = new THREE.Group();
+        group.userData.modelFamily = family;
+
+        const bus = modelMaterial(0xb8c3d6, { roughness: 0.42, metalness: 0.55 });
+        const darkBus = modelMaterial(0x2f3544, { roughness: 0.5, metalness: 0.45 });
+        const panel = modelMaterial(0x143f7e, { roughness: 0.32, metalness: 0.25, emissive: 0x08224f, emissiveIntensity: 0.2 });
+        const panelFrame = modelMaterial(0xd7dde8, { roughness: 0.4, metalness: 0.65 });
+        const gold = modelMaterial(0xd6a650, { roughness: 0.45, metalness: 0.45 });
+        const white = modelMaterial(0xe8edf5, { roughness: 0.48, metalness: 0.25 });
+
+        if (family === 'starlink' || family === 'starlink-v2') {
+            const s = family === 'starlink-v2' ? 1.18 : 1;
+            addBox(group, [0.86 * s, 0.06, 0.42 * s], [0, 0, 0], darkBus);
+            addBox(group, [0.72 * s, 0.026, 0.34 * s], [0, 0.045, 0], panel);
+            addBox(group, [0.18 * s, 0.05, 0.10 * s], [0.23 * s, 0.08, 0.02], bus);
+            addBox(group, [0.10 * s, 0.045, 0.08 * s], [-0.25 * s, 0.08, -0.02], gold);
+            for (let i = -2; i <= 2; i += 1) {
+                addBox(group, [0.012, 0.028, 0.39 * s], [i * 0.14 * s, 0.066, 0], panelFrame);
+            }
+        } else if (family === 'globalstar') {
+            addBox(group, [0.34, 0.32, 0.34], [0, 0, 0], white);
+            addCylinder(group, 0.18, 0.18, 0.22, [0, 0.19, 0], gold).rotation.x = Math.PI / 2;
+            addSolarPanel(group, [0.72, 0.035, 0.26], [-0.58, 0, 0], panel, panelFrame);
+            addSolarPanel(group, [0.72, 0.035, 0.26], [0.58, 0, 0], panel, panelFrame);
+            addDish(group, [0, -0.1, 0.26], [Math.PI / 2, 0, 0], white);
+        } else if (family === 'oneweb' || family === 'iridium') {
+            addBox(group, [0.34, 0.42, 0.28], [0, 0, 0], white);
+            addSolarPanel(group, [0.56, 0.035, 0.34], [-0.48, 0, 0], panel, panelFrame);
+            addSolarPanel(group, [0.56, 0.035, 0.34], [0.48, 0, 0], panel, panelFrame);
+            addDish(group, [0, 0.28, 0.16], [Math.PI / 2, 0, 0], gold);
+        } else if (family === 'cubesat') {
+            addBox(group, [0.34, 0.34, 0.34], [0, 0, 0], darkBus);
+            addBox(group, [0.31, 0.012, 0.31], [0, 0.18, 0], panel);
+            addBox(group, [0.31, 0.31, 0.012], [0, 0, 0.18], panel);
+            addBox(group, [0.018, 0.42, 0.018], [0.2, 0.08, 0.2], gold);
+        } else if (family === 'radar') {
+            addBox(group, [0.34, 0.28, 0.28], [0, 0, 0], white);
+            addSolarPanel(group, [0.46, 0.03, 0.22], [-0.4, 0, 0], panel, panelFrame);
+            addBox(group, [0.92, 0.035, 0.24], [0.42, 0.02, 0], gold);
+            addDish(group, [0, -0.08, 0.25], [Math.PI / 2, 0, 0], white);
+        } else if (family === 'navigation') {
+            addBox(group, [0.42, 0.38, 0.34], [0, 0, 0], white);
+            addSolarPanel(group, [0.68, 0.035, 0.28], [-0.56, 0, 0], panel, panelFrame);
+            addSolarPanel(group, [0.68, 0.035, 0.28], [0.56, 0, 0], panel, panelFrame);
+            addCylinder(group, 0.12, 0.12, 0.18, [0, 0.3, 0], gold);
+            addDish(group, [0, 0.38, 0], [0, 0, 0], gold);
+        } else if (family === 'comms') {
+            addBox(group, [0.42, 0.42, 0.42], [0, 0, 0], white);
+            addSolarPanel(group, [0.84, 0.035, 0.34], [-0.66, 0, 0], panel, panelFrame);
+            addSolarPanel(group, [0.84, 0.035, 0.34], [0.66, 0, 0], panel, panelFrame);
+            addDish(group, [0, 0.02, 0.34], [Math.PI / 2, 0, 0], gold);
+            addDish(group, [0.16, -0.06, 0.3], [Math.PI / 2, 0.3, 0], white);
+        } else {
+            addBox(group, [0.34, 0.3, 0.28], [0, 0, 0], white);
+            addSolarPanel(group, [0.52, 0.03, 0.24], [-0.44, 0, 0], panel, panelFrame);
+            addSolarPanel(group, [0.52, 0.03, 0.24], [0.44, 0, 0], panel, panelFrame);
+            addDish(group, [0, 0.18, 0.18], [Math.PI / 2, 0, 0], gold);
+        }
+
+        group.traverse((child) => {
+            child.frustumCulled = false;
+            if (child.isMesh) child.castShadow = false;
+        });
         return group;
+    }
+
+    function updateFocusedSatelliteModel(satellite) {
+        if (!state.satelliteHighlight) return;
+        const modelRoot = state.satelliteHighlight.userData.modelRoot;
+        if (!modelRoot) return;
+        if (!satellite) {
+            modelRoot.clear();
+            modelRoot.visible = false;
+            state.satelliteFocusedModelKey = '';
+            return;
+        }
+
+        const family = satelliteModelFamily(satellite);
+        const modelKey = `${satellite.id}:${family}:${satellite.name}`;
+        if (state.satelliteFocusedModelKey !== modelKey) {
+            modelRoot.clear();
+            modelRoot.add(buildSatelliteModel(satellite));
+            state.satelliteFocusedModelKey = modelKey;
+        }
+        modelRoot.visible = true;
+    }
+
+    function orientSatelliteHighlight(localPosition) {
+        if (!state.satelliteHighlight || !localPosition) return;
+        const radial = localPosition.clone().normalize();
+        if (radial.lengthSq() < 1e-8) return;
+
+        const earthSpinAxis = new THREE.Vector3(0, 1, 0);
+        let alongTrack = earthSpinAxis.clone().cross(radial).normalize();
+        if (alongTrack.lengthSq() < 1e-8) {
+            alongTrack = new THREE.Vector3(1, 0, 0).cross(radial).normalize();
+        }
+        if (state.followSatelliteId) {
+            const satellite = state.satelliteIndex.get(state.followSatelliteId);
+            if (Number.isFinite(satellite?.inclinationDeg) && satellite.inclinationDeg > 90) {
+                alongTrack.multiplyScalar(-1);
+            }
+        }
+
+        const side = new THREE.Vector3().crossVectors(radial, alongTrack).normalize();
+        const correctedTrack = new THREE.Vector3().crossVectors(side, radial).normalize();
+        const basis = new THREE.Matrix4().makeBasis(side, radial, correctedTrack.clone().multiplyScalar(-1));
+        state.satelliteHighlight.quaternion.setFromRotationMatrix(basis);
     }
 
     function createMoon() {
@@ -2579,6 +2747,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         return `${formatSatelliteNumber(minutes, 0)} min`;
     }
 
+    function formatSatelliteSize(satellite) {
+        if (satellite?.sizeLabel) return satellite.sizeLabel;
+        if (Number.isFinite(satellite?.rcsSquareMeters)) {
+            return `RCS ${formatSatelliteNumber(satellite.rcsSquareMeters, 2)} m2 (keine Baugröße)`;
+        }
+        return '--';
+    }
+
     function formatCoordinate(value, positive, negative) {
         if (!Number.isFinite(value)) return '--';
         const hemisphere = value >= 0 ? positive : negative;
@@ -2596,6 +2772,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             if (!orbitRegimeActive(satellite.regime)) return false;
             if (!query) return true;
             return satellite.name.toLowerCase().includes(query) ||
+                String(satellite.satcatObjectId || '').toLowerCase().includes(query) ||
+                String(satellite.operator || '').toLowerCase().includes(query) ||
                 String(satellite.id).includes(query);
         });
 
@@ -2642,7 +2820,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
             const meta = document.createElement('div');
             meta.className = 'sat-result-meta';
-            meta.textContent = `${satellite.regime} · ${satellite.type || 'Satellit'} · Hoehe ${formatAltitudeKm(satellite.altitudeKm)} · NORAD ${satellite.id}`;
+            meta.textContent = `${satellite.regime} · ${satellite.type || 'Satellit'} · ${satellite.operator || 'Profil ausstehend'} · Hoehe ${formatAltitudeKm(satellite.altitudeKm)} · NORAD ${satellite.id}`;
 
             const actions = document.createElement('div');
             actions.className = 'sat-result-actions';
@@ -2676,6 +2854,409 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function satelliteProfile(type, operator, country, source = 'Name erkannt') {
         return { type, operator, country, profileSource: source };
+    }
+
+    function baseSatelliteProfile(regime) {
+        return satelliteProfile(
+            regime === 'GEO' ? 'Satellit (GEO)' : 'Satellit',
+            'SATCAT-Abfrage ausstehend',
+            'SATCAT-Abfrage ausstehend',
+            'TLE/NORAD'
+        );
+    }
+
+    const SATCAT_OWNER_LABELS = {
+        AB: 'Arab Satellite Communications Organization',
+        ALG: 'Algerien',
+        ARGN: 'Argentinien',
+        AUS: 'Australien',
+        AZER: 'Aserbaidschan',
+        BEL: 'Belgien',
+        BGR: 'Bulgarien',
+        BOL: 'Bolivien',
+        BRAZ: 'Brasilien',
+        CA: 'Kanada',
+        CHBZ: 'China/Brasilien',
+        CHLE: 'Chile',
+        CIS: 'Russland/GUS',
+        COL: 'Kolumbien',
+        CZCH: 'Tschechien',
+        DEN: 'Daenemark',
+        ECU: 'Ecuador',
+        EGY: 'Aegypten',
+        ESA: 'ESA',
+        EUME: 'EUMETSAT',
+        EUTE: 'Eutelsat',
+        FGER: 'Frankreich/Deutschland',
+        FR: 'Frankreich',
+        GER: 'Deutschland',
+        GLOB: 'Globalstar',
+        GREC: 'Griechenland',
+        HUN: 'Ungarn',
+        IM: 'Inmarsat',
+        IND: 'Indien',
+        INDO: 'Indonesien',
+        IRAN: 'Iran',
+        IRAQ: 'Irak',
+        ISRA: 'Israel',
+        ISS: 'Internationale Raumstation',
+        IT: 'Italien',
+        JPN: 'Japan',
+        KAZ: 'Kasachstan',
+        LAOS: 'Laos',
+        LTU: 'Litauen',
+        LUXE: 'Luxemburg',
+        MALA: 'Malaysia',
+        MEX: 'Mexiko',
+        NATO: 'NATO',
+        NETH: 'Niederlande',
+        NICO: 'Nicaragua',
+        NIG: 'Nigeria',
+        NKOR: 'Nordkorea',
+        NOR: 'Norwegen',
+        NZ: 'Neuseeland',
+        O3B: 'O3b/SES',
+        PAKI: 'Pakistan',
+        PER: 'Peru',
+        POL: 'Polen',
+        PRC: 'China',
+        RASC: 'RascomStar-QAF',
+        ROC: 'Taiwan',
+        ROM: 'Rumaenien',
+        RP: 'Philippinen',
+        SAFR: 'Suedafrika',
+        SAUD: 'Saudi-Arabien',
+        SDN: 'Sudan',
+        SES: 'SES',
+        SGP: 'Singapur',
+        SKOR: 'Suedkorea',
+        SPN: 'Spanien',
+        SWED: 'Schweden',
+        SWTZ: 'Schweiz',
+        TBD: 'Nicht bestaetigt',
+        THAI: 'Thailand',
+        TMMC: 'Turkmenistan/Monaco',
+        TURK: 'Tuerkei',
+        UAE: 'Vereinigte Arabische Emirate',
+        UK: 'Vereinigtes Koenigreich',
+        UKR: 'Ukraine',
+        UNK: 'Unbekannt',
+        US: 'USA',
+        USBZ: 'USA/Brasilien',
+        VENZ: 'Venezuela',
+        VTNM: 'Vietnam'
+    };
+
+    const SATCAT_COUNTRY_OVERRIDES = {
+        AB: 'Saudi-Arabien',
+        EUME: 'Europa',
+        EUTE: 'Frankreich',
+        GLOB: 'USA',
+        IM: 'Vereinigtes Koenigreich',
+        INTL: 'USA/Luxemburg',
+        ISS: 'International',
+        O3B: 'Luxemburg',
+        RASC: 'Mauritius',
+        SES: 'Luxemburg'
+    };
+
+    const SATCAT_OPERATOR_LABELS = {
+        AB: 'Arabsat',
+        EUME: 'EUMETSAT',
+        EUTE: 'Eutelsat',
+        GLOB: 'Globalstar',
+        IM: 'Inmarsat',
+        INTL: 'Intelsat',
+        ISS: 'ISS-Partner',
+        NATO: 'NATO',
+        O3B: 'O3b/SES',
+        RASC: 'RascomStar-QAF',
+        SES: 'SES'
+    };
+
+    const SATELLITE_NAME_OPERATOR_PROFILES = [
+        [/^STARLINK\b/, 'SpaceX', 'USA'],
+        [/^GLOBALSTAR\b/, 'Globalstar', 'USA'],
+        [/^ONEWEB\b/, 'Eutelsat OneWeb', 'Vereinigtes Koenigreich/Frankreich'],
+        [/^KUIPER\b|PROJECT KUIPER/, 'Amazon Project Kuiper', 'USA'],
+        [/^IRIDIUM\b/, 'Iridium Communications', 'USA'],
+        [/^ORBCOMM\b/, 'ORBCOMM', 'USA'],
+        [/^O3B\b/, 'O3b/SES', 'Luxemburg'],
+        [/^SES\b/, 'SES', 'Luxemburg'],
+        [/^LEMUR\b/, 'Spire Global', 'USA/Luxemburg'],
+        [/^FLOCK\b|^DOVE\b|^SKYSAT\b/, 'Planet Labs', 'USA'],
+        [/^ICEYE\b/, 'ICEYE', 'Finnland'],
+        [/^CAPELLA\b/, 'Capella Space', 'USA'],
+        [/^HAWK\b/, 'HawkEye 360', 'USA'],
+        [/^GPS\b|^NAVSTAR\b/, 'U.S. Space Force', 'USA'],
+        [/^GALILEO\b|^GSAT01\b|^GSAT02\b/, 'EU/ESA/EUSPA', 'Europaeische Union'],
+        [/^GLONASS\b/, 'Roskosmos', 'Russland'],
+        [/^BEIDOU\b|^COMPASS\b/, 'BeiDou/CNSA', 'China'],
+        [/^QZSS\b|^MICHIBIKI\b/, 'Cabinet Office/JAXA', 'Japan'],
+        [/^IRNSS\b|^NAVIC\b/, 'ISRO', 'Indien'],
+        [/^TDRS\b/, 'NASA', 'USA'],
+        [/^GOES\b|^NOAA\b|^JPSS\b|^SUOMI NPP\b/, 'NOAA/NASA', 'USA'],
+        [/^SENTINEL\b/, 'ESA/Copernicus', 'Europaeische Union'],
+        [/^LANDSAT\b/, 'NASA/USGS', 'USA']
+    ];
+
+    const SATELLITE_NAME_SIZE_PROFILES = [
+        [/^STARLINK\b.*(?:V2|V2 MINI)/, 'ca. 4,1 x 2,7 m'],
+        [/^STARLINK\b/, 'ca. 2,8 x 1,4 m'],
+        [/^ONEWEB\b/, 'ca. 1,0 x 1,0 x 1,3 m'],
+        [/^GLOBALSTAR\b/, 'ca. 2,4 x 2,4 x 1,3 m'],
+        [/^IRIDIUM\b/, 'ca. 3,1 x 2,4 x 1,5 m'],
+        [/^ORBCOMM\b/, 'ca. 1 m Klasse'],
+        [/^O3B\b/, 'mehrere Meter'],
+        [/^SES\b/, 'mehrere Meter'],
+        [/^KUIPER\b|PROJECT KUIPER/, 'nicht veroeffentlicht'],
+        [/^LEMUR\b/, 'ca. 3U/6U CubeSat'],
+        [/^FLOCK\b|^DOVE\b/, 'ca. 3U CubeSat'],
+        [/^SKYSAT\b/, 'ca. 60 x 60 x 95 cm'],
+        [/^ICEYE\b/, 'ca. 1 m Klasse'],
+        [/^CAPELLA\b/, 'mehrere Meter entfaltet'],
+        [/^HAWK\b/, 'ca. ESPA/CubeSat-Klasse'],
+        [/^GPS\b|^NAVSTAR\b/, 'mehrere Meter'],
+        [/^GALILEO\b|^GSAT01\b|^GSAT02\b/, 'ca. 2,7 x 1,2 x 1,1 m'],
+        [/^GLONASS\b/, 'mehrere Meter'],
+        [/^BEIDOU\b|^COMPASS\b/, 'mehrere Meter'],
+        [/^QZSS\b|^MICHIBIKI\b/, 'mehrere Meter'],
+        [/^TDRS\b/, 'mehrere Meter'],
+        [/^GOES\b/, 'mehrere Meter'],
+        [/^NOAA\b|^JPSS\b|^SUOMI NPP\b/, 'mehrere Meter'],
+        [/^SENTINEL-1\b/, 'ca. 3,4 x 1,3 x 1,3 m'],
+        [/^SENTINEL-2\b/, 'ca. 3,4 x 1,8 x 2,4 m'],
+        [/^SENTINEL\b/, 'mehrere Meter'],
+        [/^LANDSAT\b/, 'mehrere Meter']
+    ];
+
+    function satcatOwnerLabel(owner) {
+        const code = String(owner || '').trim().toUpperCase();
+        return SATCAT_COUNTRY_OVERRIDES[code] || SATCAT_OWNER_LABELS[code] || code || 'Nicht eindeutig';
+    }
+
+    function satelliteOperatorFallback(owner) {
+        const code = String(owner || '').trim().toUpperCase();
+        if (SATCAT_OPERATOR_LABELS[code]) return SATCAT_OPERATOR_LABELS[code];
+        return code ? 'Nicht eindeutig' : 'Profil ausstehend';
+    }
+
+    function satelliteNameOperatorProfile(name) {
+        const normalized = String(name || '').trim().toUpperCase();
+        if (!normalized) return null;
+        const match = SATELLITE_NAME_OPERATOR_PROFILES.find(([pattern]) => pattern.test(normalized));
+        return match ? { operator: match[1], country: match[2] } : null;
+    }
+
+    function satelliteNameSizeProfile(name) {
+        const normalized = String(name || '').trim().toUpperCase();
+        if (!normalized) return '';
+        const match = SATELLITE_NAME_SIZE_PROFILES.find(([pattern]) => pattern.test(normalized));
+        return match ? match[1] : '';
+    }
+
+    function satcatTypeLabel(type) {
+        const code = String(type || '').trim().toUpperCase();
+        if (code === 'PAY') return 'Nutzlast/Satellit';
+        if (code === 'R/B') return 'Raketenkörper';
+        if (code === 'DEB') return 'Weltraumschrott';
+        if (code === 'UNK') return 'Unbekanntes Objekt';
+        return code || 'Satellit';
+    }
+
+    function parseSatelliteFloat(value) {
+        if (value === null || value === undefined) return NaN;
+        const parsed = Number.parseFloat(String(value).replace(',', '.'));
+        return Number.isFinite(parsed) ? parsed : NaN;
+    }
+
+    function dimensionPart(label, value) {
+        const parsed = parseSatelliteFloat(value);
+        return Number.isFinite(parsed) ? `${label} ${formatSatelliteNumber(parsed, parsed < 10 ? 2 : 1)} m` : '';
+    }
+
+    function wikidataProfileFromBindings(bindings) {
+        const row = Array.isArray(bindings) && bindings.length ? bindings[0] : null;
+        if (!row) return null;
+        const length = dimensionPart('L', row.length?.value);
+        const width = dimensionPart('B', row.width?.value);
+        const height = dimensionPart('H', row.height?.value);
+        const diameter = dimensionPart('D', row.diameter?.value);
+        const dimensions = [length, width, height].filter(Boolean);
+        const sizeLabel = dimensions.length ? dimensions.join(' x ') : diameter;
+        return {
+            label: row.itemLabel?.value || '',
+            operator: row.operatorLabel?.value || row.manufacturerLabel?.value || row.ownerLabel?.value || '',
+            sizeLabel
+        };
+    }
+
+    function applySatelliteProfileData(satellite, payload) {
+        if (!satellite || !payload) return;
+        const satcat = payload.satcat || null;
+        const wikidata = payload.wikidata || null;
+        const sources = [];
+
+        if (satcat) {
+            const satcatName = satcat.OBJECT_NAME || satcat.objectName || satcat.name;
+            const owner = satcat.OWNER || satcat.owner;
+            const nameProfile = satelliteNameOperatorProfile(satcatName || satellite.name);
+            satellite.name = satcatName || satellite.name;
+            satellite.type = satcatTypeLabel(satcat.OBJECT_TYPE || satcat.objectType);
+            satellite.country = nameProfile?.country || satcatOwnerLabel(owner);
+            satellite.operator = nameProfile?.operator || satelliteOperatorFallback(owner);
+            satellite.satcatObjectId = satcat.OBJECT_ID || satcat.objectId || satellite.satcatObjectId;
+            const rcs = parseSatelliteFloat(satcat.RCS || satcat.rcs);
+            if (Number.isFinite(rcs)) satellite.rcsSquareMeters = rcs;
+            sources.push('CelesTrak SATCAT');
+        }
+
+        if (wikidata) {
+            if (wikidata.operator) satellite.operator = wikidata.operator;
+            if (wikidata.sizeLabel) {
+                satellite.sizeLabel = wikidata.sizeLabel;
+            } else {
+                const length = dimensionPart('L', wikidata.lengthM);
+                const width = dimensionPart('B', wikidata.widthM);
+                const height = dimensionPart('H', wikidata.heightM);
+                const diameter = dimensionPart('D', wikidata.diameterM);
+                const dimensions = [length, width, height].filter(Boolean);
+                if (dimensions.length) satellite.sizeLabel = dimensions.join(' x ');
+                else if (diameter) satellite.sizeLabel = diameter;
+            }
+            if (!satcat && wikidata.label) satellite.name = wikidata.label;
+            sources.push('Wikidata');
+        }
+
+        if (!satellite.sizeLabel) {
+            satellite.sizeLabel = satelliteNameSizeProfile(satellite.name);
+        }
+
+        satellite.profileSource = sources.length ? sources.join(' + ') : 'TLE/NORAD';
+        satellite.profileLoaded = Boolean(sources.length);
+    }
+
+    async function fetchCelestrakSatcatRecord(satellite) {
+        const makeUrl = (mode) => {
+            const params = new URLSearchParams({ FORMAT: 'JSON' });
+            if (mode === 'catnr' && satellite?.id) params.set('CATNR', String(satellite.id));
+            if (mode === 'name' && satellite?.name) {
+                params.set('NAME', satellite.name);
+                params.set('MAX', '1');
+            }
+            return `${CELESTRAK_SATCAT_RECORDS_URL}?${params.toString()}`;
+        };
+        const mode = satellite?.id ? 'catnr' : 'name';
+        let url = makeUrl(mode);
+        if (!url.includes('CATNR=') && !url.includes('NAME=')) return null;
+        let response = await fetch(url, {
+            cache: 'force-cache',
+            headers: { Accept: 'application/json' }
+        });
+        if (!response.ok) throw new Error(`SATCAT HTTP ${response.status}`);
+        let payload = await response.json();
+        let records = Array.isArray(payload) ? payload : [];
+        if (!records.length && mode === 'catnr' && satellite?.name) {
+            response = await fetch(makeUrl('name'), {
+                cache: 'force-cache',
+                headers: { Accept: 'application/json' }
+            });
+            if (!response.ok) throw new Error(`SATCAT HTTP ${response.status}`);
+            payload = await response.json();
+            records = Array.isArray(payload) ? payload : [];
+        }
+        return records.find((record) => String(record.NORAD_CAT_ID || record.noradCatId || '') === String(satellite?.id)) ||
+            records[0] ||
+            null;
+    }
+
+    async function fetchWikidataSatelliteRecord(satellite) {
+        if (!satellite?.id) return null;
+        const rawId = String(satellite.id);
+        const paddedId = rawId.padStart(5, '0');
+        const query = `
+SELECT ?item ?itemLabel ?operatorLabel ?manufacturerLabel ?ownerLabel ?length ?width ?height ?diameter WHERE {
+  VALUES ?scn { "${rawId}" "${paddedId}" }
+  ?item wdt:P377 ?scn.
+  OPTIONAL { ?item wdt:P137 ?operator. }
+  OPTIONAL { ?item wdt:P176 ?manufacturer. }
+  OPTIONAL { ?item wdt:P127 ?owner. }
+  OPTIONAL { ?item wdt:P2043 ?length. }
+  OPTIONAL { ?item wdt:P2049 ?width. }
+  OPTIONAL { ?item wdt:P2048 ?height. }
+  OPTIONAL { ?item wdt:P2386 ?diameter. }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en". }
+}
+LIMIT 1`;
+        const params = new URLSearchParams({ format: 'json', query });
+        const response = await fetch(`${WIKIDATA_SPARQL_URL}?${params.toString()}`, {
+            cache: 'force-cache',
+            headers: { Accept: 'application/sparql-results+json' }
+        });
+        if (!response.ok) throw new Error(`Wikidata HTTP ${response.status}`);
+        const payload = await response.json();
+        return wikidataProfileFromBindings(payload?.results?.bindings);
+    }
+
+    async function fetchSatelliteProfileData(satellite) {
+        const params = new URLSearchParams({
+            catnr: String(satellite.id || ''),
+            name: satellite.name || '',
+            v: SATELLITE_PROFILE_CACHE_VERSION
+        });
+
+        try {
+            const response = await fetch(`${SATELLITE_PROFILE_API_URL}?${params.toString()}`, {
+                cache: 'force-cache',
+                headers: { Accept: 'application/json' }
+            });
+            if (response.ok) return response.json();
+        } catch (error) {
+            // Static hosting falls back to direct public endpoints below.
+        }
+
+        const [satcatResult, wikidataResult] = await Promise.allSettled([
+            fetchCelestrakSatcatRecord(satellite),
+            fetchWikidataSatelliteRecord(satellite)
+        ]);
+
+        return {
+            satcat: satcatResult.status === 'fulfilled' ? satcatResult.value : null,
+            wikidata: wikidataResult.status === 'fulfilled' ? wikidataResult.value : null
+        };
+    }
+
+    function ensureSatelliteProfile(satellite) {
+        if (!satellite) return null;
+        if (satellite.profileLoaded) return Promise.resolve(satellite);
+        const key = String(satellite.id || satellite.name || '');
+        if (!key) return null;
+        if (state.satelliteProfileCache.has(key)) {
+            applySatelliteProfileData(satellite, state.satelliteProfileCache.get(key));
+            return Promise.resolve(satellite);
+        }
+        if (state.satelliteProfilePending.has(key)) return state.satelliteProfilePending.get(key);
+
+        satellite.profileSource = 'SATCAT/Wikidata-Abfrage laeuft';
+        updateSatelliteFocusPanel(satellite);
+        const pending = fetchSatelliteProfileData(satellite)
+            .then((payload) => {
+                state.satelliteProfileCache.set(key, payload);
+                applySatelliteProfileData(satellite, payload);
+                if (state.followSatelliteId === satellite.id) updateSatelliteFocusPanel(satellite);
+                if (document.body.classList.contains('search-open')) renderSatelliteSearchResults();
+                return satellite;
+            })
+            .catch((error) => {
+                satellite.profileSource = `TLE/NORAD · Profil offline (${error.message || 'unbekannt'})`;
+                if (state.followSatelliteId === satellite.id) updateSatelliteFocusPanel(satellite);
+                return satellite;
+            })
+            .finally(() => {
+                state.satelliteProfilePending.delete(key);
+            });
+        state.satelliteProfilePending.set(key, pending);
+        return pending;
     }
 
     function inferSatelliteProfile(name, regime) {
@@ -2778,7 +3359,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                 const altitudeKm = Number.isFinite(geodetic?.height) ? Math.max(0, geodetic.height) : 0;
                 const orbit = getOrbitElementsFromSatrec(satrec);
                 const regime = classifyOrbitRegime(orbit, altitudeKm);
-                const profile = inferSatelliteProfile(name, regime);
+                const profile = baseSatelliteProfile(regime);
                 const color = satelliteColorForName(name);
                 const id = String(satrec.satnum || line1.slice(2, 7).trim() || entries.length + 1);
                 entries.push({
@@ -2841,6 +3422,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             ? state.satelliteIndex.get(state.followSatelliteId) || null
             : null;
         const isFollowingSatellite = Boolean(followedSatellite);
+        updateFocusedSatelliteModel(followedSatellite);
         document.body.classList.toggle('satellite-following', isFollowingSatellite);
         if (dom['satellite-focus-panel']) {
             dom['satellite-focus-panel'].setAttribute('aria-hidden', String(!isFollowingSatellite));
@@ -2874,6 +3456,22 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!satellite) {
             setText('sat-focus-title', '--');
             setText('sat-focus-subtitle', 'Keine Verfolgung aktiv');
+            [
+                'sat-focus-type',
+                'sat-focus-operator',
+                'sat-focus-country',
+                'sat-focus-profile-source',
+                'sat-focus-size',
+                'sat-focus-regime',
+                'sat-focus-altitude',
+                'sat-focus-perigee',
+                'sat-focus-apogee',
+                'sat-focus-inclination',
+                'sat-focus-period',
+                'sat-focus-eccentricity',
+                'sat-focus-latitude',
+                'sat-focus-longitude'
+            ].forEach((id) => setText(id, '--'));
             return;
         }
 
@@ -2883,6 +3481,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         setText('sat-focus-operator', satellite.operator || '--');
         setText('sat-focus-country', satellite.country || '--');
         setText('sat-focus-profile-source', satellite.profileSource || '--');
+        setText('sat-focus-size', formatSatelliteSize(satellite));
         setText('sat-focus-regime', satellite.regime || '--');
         setText('sat-focus-altitude', formatAltitudeKm(satellite.altitudeKm));
         setText('sat-focus-perigee', formatAltitudeKm(satellite.perigeeKm));
@@ -2904,6 +3503,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             return;
         }
 
+        const satellite = state.followSatelliteId
+            ? state.satelliteIndex.get(state.followSatelliteId) || null
+            : null;
+        updateFocusedSatelliteModel(satellite);
         state.satelliteHighlight.position.copy(localPosition);
         state.satelliteHighlight.visible = true;
 
@@ -2912,13 +3515,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             ? state.camera.position.distanceTo(worldPosition)
             : 60;
         const scale = THREE.MathUtils.clamp(cameraDistance * 0.018, 0.48, 9);
-        const pulse = 1 + 0.12 * Math.sin(now * 0.006);
-        state.satelliteHighlight.scale.setScalar(scale * pulse);
+        state.satelliteHighlight.scale.setScalar(scale);
+        orientSatelliteHighlight(localPosition);
 
-        const glow = state.satelliteHighlight.userData.glow;
-        if (glow) {
-            glow.scale.setScalar(glow.userData.baseScale || 1.5);
-            glow.material.opacity = 0.72 + 0.18 * (0.5 + 0.5 * Math.sin(now * 0.008));
+        const focusRing = state.satelliteHighlight.userData.focusRing;
+        if (focusRing) {
+            focusRing.scale.setScalar(focusRing.userData.baseScale || 1.65);
+            focusRing.material.opacity = 0.74 + 0.14 * (0.5 + 0.5 * Math.sin(now * 0.004));
+        }
+
+        const focusLight = state.satelliteHighlight.userData.focusLight;
+        if (focusLight) {
+            focusLight.intensity = 1.55 + 0.35 * (0.5 + 0.5 * Math.sin(now * 0.003));
         }
     }
 
@@ -3321,6 +3929,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (follow) {
             state.followSatelliteId = satelliteId;
             frameFollowedSatellite(world, satellite);
+            ensureSatelliteProfile(satellite);
         }
         refreshSatelliteFocusVisuals();
         renderSatelliteSearchResults();
@@ -3798,9 +4407,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             0.000387933 * T * T -
             (T * T * T) / 38710000;
         // Greenwich starts on the texture's +X meridian, while the J2000
-        // reference direction in this display frame points along -Z.
+        // reference direction in this display frame points along -Z. GMST
+        // advances eastward, so the display rotation must advance with it.
         return THREE.MathUtils.euclideanModulo(
-            EARTH_SIDEREAL_REFERENCE_OFFSET_RAD - THREE.MathUtils.degToRad(gmstDeg),
+            EARTH_SIDEREAL_REFERENCE_OFFSET_RAD + THREE.MathUtils.degToRad(gmstDeg),
             Math.PI * 2
         );
     }
