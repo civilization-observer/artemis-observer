@@ -1233,12 +1233,19 @@ button.stat-card:focus-visible {
 }
 
 .mission-slider-wrap,
-.orbit-setting-wrap {
+.orbit-setting-wrap,
+.language-setting-wrap {
     margin-top: 14px;
     padding: 12px;
     border-radius: 16px;
     border: 1px solid rgba(95, 216, 255, 0.14);
     background: rgba(9, 18, 37, 0.82);
+}
+
+.language-toggle-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
 }
 
 .mission-slider-head {

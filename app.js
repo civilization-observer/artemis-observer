@@ -84,41 +84,617 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const SCENE_CLICK_DRAG_TOLERANCE_PX = 7;
     const PROVIDER_STATS_WINDOW_DAYS = 100;
 
-    const localDateTime = new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    const SUPPORTED_LANGUAGES = ['en', 'de'];
+    const DACH_REGIONS = new Set(['DE', 'AT', 'CH', 'LI']);
+    const DACH_TIME_ZONES = new Set(['Europe/Berlin', 'Europe/Vienna', 'Europe/Zurich', 'Europe/Busingen']);
 
-    const localShortDateTime = new Intl.DateTimeFormat(undefined, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZoneName: 'short'
-    });
+    const TEXT = {
+        en: {
+            'a11y.language': 'Overlay language',
+            'language.title': 'Language',
+            'language.description': 'Choose the language used by the overlay. The first visit defaults to German in the DACH region and English everywhere else.',
+            'language.label': 'Overlay language',
+            'language.english': 'English',
+            'language.german': 'Deutsch',
+            'settings.artemis.open': 'Open Artemis',
+            'settings.artemis.close': 'Close Artemis',
+            'artemis.replay.on': 'Space replay on',
+            'artemis.replay.off': 'Space replay off',
+            'scene.replay': 'Replay mode: Artemis II active in space',
+            'scene.home': 'Home mode: Earth Launch Tracker',
+            'countdown.reached': 'Launch window reached',
+            'common.unknown': 'Unknown',
+            'common.none': 'none',
+            'common.provider': 'Provider',
+            'launch.unknownOrg': 'Unknown',
+            'launch.unknownPad': 'Unknown pad',
+            'launch.unknownRocket': 'Rocket unknown',
+            'launch.unknownStatus': 'Status unknown',
+            'launch.unnamed': 'Unnamed launch',
+            'launch.noStory': 'No mission description is available for this launch in the feed.',
+            'launch.selected': 'Selected launch',
+            'launch.chooseFromFeed': 'Select a launch from the Launch Feed on the right.',
+            'launch.noUpcoming': 'No upcoming Earth launches with coordinates found.',
+            'launch.loading': 'Loading launch data ...',
+            'launch.staticUnavailable': 'Static launch data unavailable',
+            'launch.historyLoading': 'Loading launch history ...',
+            'launch.historyEmpty': 'No historical launches loaded yet.',
+            'launch.historyMoreLoading': 'Loading more history ...',
+            'launch.historyMoreHint': 'Scroll further for older launches',
+            'launch.historyWaiting': 'Launch history waiting ({error})',
+            'launch.historyStatus': 'Worker history | {count} observed launches',
+            'launch.workerStatus': 'Worker data | {age} | {count} launches',
+            'launch.staticHistoryUnavailable': 'Static history unavailable',
+            'launch.status.success': 'Successful',
+            'launch.status.failure': 'Failed',
+            'launch.status.cancelled': 'Scrubbed / cancelled',
+            'launch.status.delayed': 'Delayed',
+            'launch.status.goT15': 'Go at T-15',
+            'launch.intel.cancelled': 'Launch cancelled - watch stays red.',
+            'launch.intel.delayed': 'Launch delayed or not yet confirmed.',
+            'launch.intel.failure': 'Launch failure confirmed.',
+            'launch.intel.success': 'Launch success confirmed.',
+            'launch.intel.go': 'T-15 confirmed by worker - timer is live green.',
+            'launch.intel.noTime': 'Monitoring is waiting for a valid launch time.',
+            'launch.intel.t15Queued': 'Worker has queued the T-15 check.',
+            'launch.intel.preflightLoaded': 'Preflight status loaded from worker data.',
+            'launch.intel.preflightChecking': 'Worker is checking T-15 status.',
+            'launch.intel.windowReached': 'Launch window reached - worker checks T+30.',
+            'launch.intel.postflightLoaded': 'Postflight status loaded from worker data.',
+            'launch.intel.postflightChecking': 'Worker is catching up the T+30 check.',
+            'stream.found': 'Official stream found.',
+            'stream.open': 'Open livestream',
+            'stream.searchReady': 'No official stream in the feed yet - search prepared.',
+            'stream.searchYoutube': 'Search YouTube',
+            'stats.deltaSame': 'same vs {label}',
+            'stats.previous.week': 'Previous week',
+            'stats.previous.month': 'Previous month',
+            'stats.previous.year': 'Previous year',
+            'stats.title.week': 'Successful week',
+            'stats.title.month': 'Successful month',
+            'stats.title.year': 'Successful year',
+            'stats.title.success': 'Successful launches',
+            'stats.title.providers': 'Providers',
+            'stats.title.live': 'Live tracked',
+            'stats.subtitle.loadingHistory': 'Launch history is loading',
+            'stats.subtitle.history': 'Trend from {count} stored launches',
+            'stats.subtitle.providers': 'Total launches in the last {days} days',
+            'stats.subtitle.workerGlobal': 'Global worker trend',
+            'stats.metric.current': 'Current',
+            'stats.metric.total': 'Total',
+            'stats.metric.providers': 'Providers',
+            'stats.metric.now': 'Now',
+            'stats.metric.samples': 'Samples',
+            'stats.empty.loadingTrend': 'Loading launch data for the trend ...',
+            'stats.empty.providersLoading': 'Loading provider statistics ...',
+            'stats.empty.providersNone': 'No launches found in the last 100 days.',
+            'stats.empty.satHistory': 'No global satellite history loaded yet.',
+            'stats.chart.satHistory': 'Live tracked satellites over time',
+            'time.range': '{start} to {end}',
+            'age.notGenerated': 'not generated yet',
+            'age.minutes': '{count} min old',
+            'age.hours': '{count} h old',
+            'orbit.rev.one': '1 orbit',
+            'orbit.rev.many': '{count} orbits',
+            'sat.libraryMissing': 'The satellite library could not be loaded.',
+            'sat.libraryLoadFailed': 'Satellite library could not be loaded ({count} CDN attempts).',
+            'sat.catalogLoading': 'Loading satellite catalog ...',
+            'sat.catalogReady': '{total} estimated in orbit | {trackable} publicly trackable | {live} visible live | Filter: {enabled}',
+            'sat.catalogIntro': 'Matches will appear here once the public satellite catalog is loaded.',
+            'sat.noResults': 'No publicly trackable satellite currently matches your search.',
+            'sat.typeFallback': 'Satellite',
+            'sat.typeGeo': 'Satellite (GEO)',
+            'sat.profilePending': 'Profile pending',
+            'sat.satcatPending': 'SATCAT lookup pending',
+            'sat.notClear': 'Not clear',
+            'sat.tleNoOperator': 'TLE without operator field',
+            'sat.focus': 'Focus',
+            'sat.follow': 'Follow',
+            'sat.following': 'Tracking on',
+            'sat.height': 'Altitude',
+            'sat.noActiveFollow': 'No tracking active',
+            'sat.cacheFallback': 'Satellites from local cache | Live source currently unreachable ({error}).',
+            'sat.catalogLoadFailed': 'Satellite catalog could not be loaded ({error}).',
+            'sat.libraryUnavailable': 'Satellite library unavailable.',
+            'sat.staticCatalogEmpty': 'static satellite catalog empty',
+            'sat.unknownError': 'unknown error',
+            'sat.rcsNoSize': 'no physical size',
+            'satcat.notConfirmed': 'Not confirmed',
+            'satcat.unknown': 'Unknown',
+            'satcat.payload': 'Payload/satellite',
+            'satcat.rocketBody': 'Rocket body',
+            'satcat.debris': 'Space debris',
+            'satcat.unknownObject': 'Unknown object',
+            'profile.queryRunning': 'SATCAT/Wikidata lookup running',
+            'profile.offline': 'TLE/NORAD | Profile offline ({error})',
+            'profile.fromName': 'Derived from name',
+            'profile.tleName': 'TLE name',
+            'profile.spaceDebris': 'Space debris',
+            'profile.rocketBody': 'Rocket body',
+            'profile.uncataloged': 'Uncataloged payload/object',
+            'profile.noActiveOperator': 'No active operator',
+            'size.classOneMeter': 'approx. 1 m class',
+            'size.severalMeters': 'several meters',
+            'size.notPublished': 'not published',
+            'size.severalMetersDeployed': 'several meters deployed',
+            'size.espaCubesat': 'approx. ESPA/CubeSat class',
+            'zoom.millionKm': '{value} million km',
+            'body.sun': 'Sun',
+            'body.earth': 'Earth',
+            'body.moon': 'Moon',
+            'mission.beforeStart': 'Before launch',
+            'mission.phase.earthOrbit': 'Launch & Earth orbit',
+            'mission.phase.highOrbit': 'High elliptical orbit',
+            'mission.phase.tli': 'TLI burn & Earth departure',
+            'mission.phase.outbound': 'Lunar transit (outbound)',
+            'mission.phase.flyby': 'Lunar flyby',
+            'mission.phase.return': 'Return transit to Earth',
+            'mission.phase.entry': 'Reentry & splashdown',
+            'mission.milestone.boosterSep': 'Booster separation (SRB)',
+            'mission.milestone.icpsSep': 'ICPS separation',
+            'mission.milestone.prm': 'Perigee raise maneuver (PRM)',
+            'mission.milestone.arb': 'Apogee raise maneuver (ARB)',
+            'mission.milestone.icpsProximity': 'Proximity ops test with ICPS',
+            'mission.milestone.prb': 'Perigee correction (PRB)',
+            'mission.milestone.tli': 'TLI burn (lunar course)',
+            'mission.milestone.otc1': 'Outbound trajectory correction OTC-1',
+            'mission.milestone.otc2': 'Outbound trajectory correction OTC-2',
+            'mission.milestone.moonApproach': 'Approach to the Moon',
+            'mission.milestone.signalLoss': 'Signal loss (far side of Moon)',
+            'mission.milestone.closestMoon': 'Closest lunar approach',
+            'mission.milestone.signalReturn': 'Signal reacquired',
+            'mission.milestone.flybyComplete': 'Lunar flyby complete',
+            'mission.milestone.rtc1': 'Return trajectory correction RTC-1',
+            'mission.milestone.rtc2': 'Return trajectory correction RTC-2',
+            'mission.milestone.serviceModuleSep': 'Service module separation',
+            'mission.milestone.reentry': 'Reentry (Entry Interface)',
+            'mission.milestone.parachute': 'Parachute deployment',
+            'mission.milestone.splashdown': 'Splashdown in the Pacific'
+        },
+        de: {
+            'a11y.language': 'Overlay-Sprache',
+            'language.title': 'Sprache',
+            'language.description': 'Waehle die Sprache fuer das Overlay. Beim ersten Besuch ist Deutsch im DACH-Raum aktiv, sonst Englisch.',
+            'language.label': 'Overlay-Sprache',
+            'language.english': 'English',
+            'language.german': 'Deutsch',
+            'settings.artemis.open': 'Artemis oeffnen',
+            'settings.artemis.close': 'Artemis schliessen',
+            'artemis.replay.on': 'Replay im Raum an',
+            'artemis.replay.off': 'Replay im Raum aus',
+            'scene.replay': 'Replay-Modus: Artemis II im Raum aktiv',
+            'scene.home': 'Home-Modus: Earth Launch Tracker',
+            'countdown.reached': 'Startfenster erreicht',
+            'common.unknown': 'Unbekannt',
+            'common.none': 'keine',
+            'common.provider': 'Anbieter',
+            'launch.unknownOrg': 'Unbekannt',
+            'launch.unknownPad': 'Unbekanntes Pad',
+            'launch.unknownRocket': 'Rakete unbekannt',
+            'launch.unknownStatus': 'Status unbekannt',
+            'launch.unnamed': 'Unbenannter Start',
+            'launch.noStory': 'Zu diesem Start liegt im Feed keine Missionsbeschreibung vor.',
+            'launch.selected': 'Ausgewaehlter Start',
+            'launch.chooseFromFeed': 'Waehle rechts im Launch Feed einen Start aus.',
+            'launch.noUpcoming': 'Keine anstehenden Earth-Launches mit Koordinaten gefunden.',
+            'launch.loading': 'Lade Startdaten ...',
+            'launch.staticUnavailable': 'Statische Startdaten nicht erreichbar',
+            'launch.historyLoading': 'Lade Starthistorie ...',
+            'launch.historyEmpty': 'Noch keine historischen Starts geladen.',
+            'launch.historyMoreLoading': 'Laedt weitere Historie ...',
+            'launch.historyMoreHint': 'Weiter scrollen fuer aeltere Starts',
+            'launch.historyWaiting': 'Starthistorie wartet ({error})',
+            'launch.historyStatus': 'Worker-Historie | {count} beobachtete Starts',
+            'launch.workerStatus': 'Worker-Daten | {age} | {count} Starts',
+            'launch.staticHistoryUnavailable': 'Statische Historie nicht erreichbar',
+            'launch.status.success': 'Erfolgreich',
+            'launch.status.failure': 'Fehlgeschlagen',
+            'launch.status.cancelled': 'Scrubbed / abgesagt',
+            'launch.status.delayed': 'Verschoben',
+            'launch.status.goT15': 'Go bei T-15',
+            'launch.intel.cancelled': 'Start abgesagt - Watch bleibt auf rot.',
+            'launch.intel.delayed': 'Start verzoegert oder noch nicht bestaetigt.',
+            'launch.intel.failure': 'Start fehlgeschlagen bestaetigt.',
+            'launch.intel.success': 'Start erfolgreich bestaetigt.',
+            'launch.intel.go': 'T-15 vom Worker bestaetigt - Timer ist live-gruen.',
+            'launch.intel.noTime': 'Monitoring wartet auf eine gueltige Startzeit.',
+            'launch.intel.t15Queued': 'Worker hat T-15 Check vorgemerkt.',
+            'launch.intel.preflightLoaded': 'Preflight-Status aus Worker-Daten geladen.',
+            'launch.intel.preflightChecking': 'Worker prueft den T-15 Status.',
+            'launch.intel.windowReached': 'Startfenster erreicht - Worker prueft T+30.',
+            'launch.intel.postflightLoaded': 'Postflight-Status aus Worker-Daten geladen.',
+            'launch.intel.postflightChecking': 'Worker holt den T+30 Check nach.',
+            'stream.found': 'Offizieller Stream gefunden.',
+            'stream.open': 'Livestream oeffnen',
+            'stream.searchReady': 'Noch kein offizieller Stream im Feed - Suche vorbereitet.',
+            'stream.searchYoutube': 'Auf YouTube suchen',
+            'stats.deltaSame': 'gleich vs {label}',
+            'stats.previous.week': 'Vorwoche',
+            'stats.previous.month': 'Vormonat',
+            'stats.previous.year': 'Vorjahr',
+            'stats.title.week': 'Erfolgreich Woche',
+            'stats.title.month': 'Erfolgreich Monat',
+            'stats.title.year': 'Erfolgreich Jahr',
+            'stats.title.success': 'Erfolgreiche Starts',
+            'stats.title.providers': 'Anbieter',
+            'stats.title.live': 'Live getrackt',
+            'stats.subtitle.loadingHistory': 'Starthistorie wird geladen',
+            'stats.subtitle.history': 'Verlauf aus {count} gespeicherten Starts',
+            'stats.subtitle.providers': 'Gesamtstarts der letzten {days} Tage',
+            'stats.subtitle.workerGlobal': 'Globaler Worker-Verlauf',
+            'stats.metric.current': 'Aktuell',
+            'stats.metric.total': 'Gesamt',
+            'stats.metric.providers': 'Anbieter',
+            'stats.metric.now': 'Jetzt',
+            'stats.metric.samples': 'Samples',
+            'stats.empty.loadingTrend': 'Lade Startdaten fuer den Verlauf ...',
+            'stats.empty.providersLoading': 'Lade Anbieterstatistik ...',
+            'stats.empty.providersNone': 'Keine Starts in den letzten 100 Tagen gefunden.',
+            'stats.empty.satHistory': 'Noch keine globale Satellitenhistorie geladen.',
+            'stats.chart.satHistory': 'Live getrackte Satelliten im Verlauf',
+            'time.range': '{start} bis {end}',
+            'age.notGenerated': 'noch nicht generiert',
+            'age.minutes': '{count} min alt',
+            'age.hours': '{count} h alt',
+            'orbit.rev.one': '1 Umlauf',
+            'orbit.rev.many': '{count} Umlaeufe',
+            'sat.libraryMissing': 'Die Satellitenbibliothek konnte nicht geladen werden.',
+            'sat.libraryLoadFailed': 'Satellitenbibliothek konnte nicht geladen werden ({count} CDN-Versuche).',
+            'sat.catalogLoading': 'Lade Satellitenkatalog ...',
+            'sat.catalogReady': '{total} im Orbit geschaetzt | {trackable} oeffentlich trackbar | {live} live sichtbar | Filter: {enabled}',
+            'sat.catalogIntro': 'Sobald der oeffentliche Satellitenkatalog geladen ist, erscheinen hier Treffer.',
+            'sat.noResults': 'Kein oeffentlich trackbarer Satellit passt gerade zu deiner Suche.',
+            'sat.typeFallback': 'Satellit',
+            'sat.typeGeo': 'Satellit (GEO)',
+            'sat.profilePending': 'Profil ausstehend',
+            'sat.satcatPending': 'SATCAT-Abfrage ausstehend',
+            'sat.notClear': 'Nicht eindeutig',
+            'sat.tleNoOperator': 'TLE ohne Betreiberfeld',
+            'sat.focus': 'Fokus',
+            'sat.follow': 'Folgen',
+            'sat.following': 'Verfolgung an',
+            'sat.height': 'Hoehe',
+            'sat.noActiveFollow': 'Keine Verfolgung aktiv',
+            'sat.cacheFallback': 'Satelliten aus lokalem Cache | Live-Quelle aktuell nicht erreichbar ({error}).',
+            'sat.catalogLoadFailed': 'Satellitenkatalog konnte nicht geladen werden ({error}).',
+            'sat.libraryUnavailable': 'Satellitenbibliothek nicht verfuegbar.',
+            'sat.staticCatalogEmpty': 'statischer Satellitenkatalog leer',
+            'sat.unknownError': 'unbekannter Fehler',
+            'sat.rcsNoSize': 'keine Baugroesse',
+            'satcat.notConfirmed': 'Nicht bestaetigt',
+            'satcat.unknown': 'Unbekannt',
+            'satcat.payload': 'Nutzlast/Satellit',
+            'satcat.rocketBody': 'Raketenkörper',
+            'satcat.debris': 'Weltraumschrott',
+            'satcat.unknownObject': 'Unbekanntes Objekt',
+            'profile.queryRunning': 'SATCAT/Wikidata-Abfrage laeuft',
+            'profile.offline': 'TLE/NORAD | Profil offline ({error})',
+            'profile.fromName': 'Aus Name abgeleitet',
+            'profile.tleName': 'TLE-Name',
+            'profile.spaceDebris': 'Weltraumschrott',
+            'profile.rocketBody': 'Raketenkörper',
+            'profile.uncataloged': 'Nicht katalogisierte Nutzlast/Objekt',
+            'profile.noActiveOperator': 'Kein aktiver Betreiber',
+            'size.classOneMeter': 'ca. 1 m Klasse',
+            'size.severalMeters': 'mehrere Meter',
+            'size.notPublished': 'nicht veroeffentlicht',
+            'size.severalMetersDeployed': 'mehrere Meter entfaltet',
+            'size.espaCubesat': 'ca. ESPA/CubeSat-Klasse',
+            'zoom.millionKm': '{value} Mio km',
+            'body.sun': 'Sonne',
+            'body.earth': 'Erde',
+            'body.moon': 'Mond',
+            'mission.beforeStart': 'Vor dem Start',
+            'mission.phase.earthOrbit': 'Start & Erdorbit',
+            'mission.phase.highOrbit': 'Hochelliptischer Orbit',
+            'mission.phase.tli': 'TLI-Burn & Erdabflug',
+            'mission.phase.outbound': 'Mondtransit (Hinflug)',
+            'mission.phase.flyby': 'Mond-Flyby',
+            'mission.phase.return': 'Ruecktransit zur Erde',
+            'mission.phase.entry': 'Wiedereintritt & Landung',
+            'mission.milestone.boosterSep': 'Booster-Abtrennung (SRB)',
+            'mission.milestone.icpsSep': 'ICPS-Abtrennung',
+            'mission.milestone.prm': 'Perigaeum-Anhebung (PRM)',
+            'mission.milestone.arb': 'Apogaeum-Anhebung (ARB)',
+            'mission.milestone.icpsProximity': 'Proximity-Ops-Test mit ICPS',
+            'mission.milestone.prb': 'Perigaeum-Korrektur (PRB)',
+            'mission.milestone.tli': 'TLI-Burn (Mondkurs)',
+            'mission.milestone.otc1': 'Outbound-Kurskorrektur OTC-1',
+            'mission.milestone.otc2': 'Outbound-Kurskorrektur OTC-2',
+            'mission.milestone.moonApproach': 'Annaeherung an den Mond',
+            'mission.milestone.signalLoss': 'Funkverlust (Mondrueckseite)',
+            'mission.milestone.closestMoon': 'Naechste Mondannaeherung',
+            'mission.milestone.signalReturn': 'Funkkontakt wiederhergestellt',
+            'mission.milestone.flybyComplete': 'Mond-Flyby abgeschlossen',
+            'mission.milestone.rtc1': 'Return-Kurskorrektur RTC-1',
+            'mission.milestone.rtc2': 'Return-Kurskorrektur RTC-2',
+            'mission.milestone.serviceModuleSep': 'Service-Modul-Abtrennung',
+            'mission.milestone.reentry': 'Wiedereintritt (Entry Interface)',
+            'mission.milestone.parachute': 'Fallschirm-Entfaltung',
+            'mission.milestone.splashdown': 'Splashdown im Pazifik'
+        }
+    };
 
-    const localTimeOnly = new Intl.DateTimeFormat(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    const STATIC_TRANSLATIONS = {
+        en: {
+            'Einstellungen': 'Settings',
+            'Settings': 'Settings',
+            'Settings schliessen': 'Close settings',
+            'Sprache': 'Language',
+            'Waehle die Sprache fuer das Overlay. Im DACH-Raum startet die App auf Deutsch, sonst auf Englisch.': 'Choose the language for the overlay. In the DACH region the app starts in German, otherwise in English.',
+            'Overlay-Sprache': 'Overlay language',
+            'Deutsch': 'German',
+            'Tracking, Flugbahn und optionale Missionsansichten.': 'Tracking, trajectories, and optional mission views.',
+            'Satelliten-Tracking': 'Satellite tracking',
+            'Lege fest, wie weit die vorausberechnete Flugbahn fuer den verfolgten Satelliten angezeigt wird.': 'Choose how far the predicted path for the tracked satellite is shown.',
+            'Flugbahn-Laenge': 'Path length',
+            'Launch-Groundtrack': 'Launch ground track',
+            'Lege fest, wie weit die blaue Bodenprojektion einer ausgewaehlten Mission vorauslaeuft.': 'Choose how far the blue ground projection for a selected mission runs ahead.',
+            'Bodenroute-Laenge': 'Ground route length',
+            'Replay-Deck und Missionsmarken nur bei Bedarf anzeigen.': 'Show the replay deck and mission markers only when needed.',
+            'Replay im Raum aus': 'Space replay off',
+            'Phase': 'Phase',
+            'Datum & Uhrzeit': 'Date & time',
+            'Entfernung Erde': 'Distance from Earth',
+            'Abstand Mond': 'Distance from Moon',
+            'Geschwindigkeit': 'Velocity',
+            'Missionsposition': 'Mission position',
+            'Zum Start': 'To launch',
+            'Zur Landung': 'To landing',
+            'Orion folgen': 'Follow Orion',
+            'Satelliten-Suche': 'Satellite Search',
+            'Suche nach ISS, Hubble, Tiangong, Starlink und allen anderen oeffentlich trackbaren Satelliten und filtere die Orbits live nach Regime.': 'Search for ISS, Hubble, Tiangong, Starlink, and all other publicly trackable satellites. Filter live orbits by regime.',
+            'Suche schliessen': 'Close search',
+            'Lade Satellitenkatalog ...': 'Loading satellite catalog ...',
+            'Ergebnisse': 'Results',
+            'Jeder Treffer kann fokussiert oder direkt verfolgt werden.': 'Each result can be focused or tracked directly.',
+            'Overview': 'Overview',
+            'Startseite': 'Home',
+            'Launches & Satelliten': 'Launches & Satellites',
+            'Getrackte Starts': 'Tracked launches',
+            'Naechster Countdown': 'Next countdown',
+            'Anbieter': 'Providers',
+            'Pads': 'Pads',
+            'Erfolgreich Woche': 'Successful week',
+            'Erfolgreich Monat': 'Successful month',
+            'Erfolgreich Jahr': 'Successful year',
+            'Satelliten im Orbit': 'Satellites in orbit',
+            'Live getrackt': 'Live tracked',
+            'Uebersicht ein- oder ausblenden': 'Show or hide overview',
+            'Anbieter-Statistik oeffnen': 'Open provider statistics',
+            'Wochenverlauf erfolgreicher Starts oeffnen': 'Open weekly trend for successful launches',
+            'Monatsverlauf erfolgreicher Starts oeffnen': 'Open monthly trend for successful launches',
+            'Jahresverlauf erfolgreicher Starts oeffnen': 'Open yearly trend for successful launches',
+            'Statistik': 'Statistics',
+            'Verlauf': 'Trend',
+            'Statistik schliessen': 'Close statistics',
+            'Mission Control schliessen': 'Close Mission Control',
+            'Ausgewaehlter Start': 'Selected launch',
+            'LiveStream': 'Livestream',
+            'Streamsuche wartet auf T-15.': 'Stream search waits for T-15.',
+            'Livestream oeffnen': 'Open livestream',
+            'Status': 'Status',
+            'Countdown': 'Countdown',
+            'Startfenster': 'Launch window',
+            'Pad': 'Pad',
+            'Koordinaten': 'Coordinates',
+            'Zum Startplatz': 'To launch pad',
+            'Monitoring wartet auf Startdaten.': 'Monitoring is waiting for launch data.',
+            'Sobald Launch-Daten geladen sind, erscheint hier die Missionsbeschreibung oder ein kurzer Kontext zum Flug.': 'Once launch data is loaded, the mission description or a short flight context appears here.',
+            'Firma': 'Company',
+            'Rakete': 'Rocket',
+            'Externe Quelle oeffnen': 'Open external source',
+            'Raketenstarts': 'Rocket launches',
+            'Launch Feed aktualisieren': 'Refresh Launch Feed',
+            'Launch Feed ein- oder ausblenden': 'Show or hide Launch Feed',
+            'Launch Feed Ansicht': 'Launch Feed view',
+            'Anstehend': 'Upcoming',
+            'Starthistorie': 'Launch history',
+            'Lade Startdaten ...': 'Loading launch data ...',
+            'Satellit verfolgt': 'Satellite tracked',
+            'Keine Verfolgung aktiv': 'No tracking active',
+            'Satellitenverfolgung beenden': 'Stop satellite tracking',
+            'Typ': 'Type',
+            'Betreiber': 'Operator',
+            'Land/Region': 'Country/region',
+            'Zuordnung': 'Assignment',
+            'Groesse': 'Size',
+            'Regime': 'Regime',
+            'Live-Hoehe': 'Live altitude',
+            'Perigaeum': 'Perigee',
+            'Apogaeum': 'Apogee',
+            'Inklination': 'Inclination',
+            'Periode': 'Period',
+            'Exzentrizitaet': 'Eccentricity',
+            'Breite': 'Latitude',
+            'Laenge': 'Longitude',
+            'Verfolgung beenden': 'Stop tracking',
+            'Steuerung ein- oder ausblenden': 'Show or hide controls',
+            'Zoom': 'Zoom',
+            'Naechster Start': 'Next launch',
+            'Erde': 'Earth',
+            'Mein Standort': 'My location',
+            'Mond': 'Moon',
+            'Sonnensystem': 'Solar system',
+            'Freie Kamera': 'Free camera',
+            'Zeit': 'Time',
+            'Jetzt': 'Now',
+            'Uebersicht einblenden': 'Show overview',
+            'Launch Feed einblenden': 'Show Launch Feed',
+            'Steuerung einblenden': 'Show controls',
+            'Mobile Navigation': 'Mobile navigation',
+            'Steuerung': 'Controls',
+            'Info': 'Info',
+            'Feed': 'Feed',
+            'Satellit': 'Satellite',
+            'Start': 'Launch'
+        },
+        de: {
+            'Settings': 'Einstellungen',
+            'Overview': 'Uebersicht',
+            'Mission Control': 'Mission Control',
+            'Launch Feed': 'Launch Feed',
+            'Earth': 'Earth'
+        }
+    };
+
+    const DATA_LABEL_TRANSLATIONS_EN = {
+        'Unbekannt': 'Unknown',
+        'Nicht eindeutig': 'Not clear',
+        'Nicht bestaetigt': 'Not confirmed',
+        'Profil ausstehend': 'Profile pending',
+        'SATCAT-Abfrage ausstehend': 'SATCAT lookup pending',
+        'TLE ohne Betreiberfeld': 'TLE without operator field',
+        'Aus Name abgeleitet': 'Derived from name',
+        'TLE-Name': 'TLE name',
+        'Satellit': 'Satellite',
+        'Satellit (GEO)': 'Satellite (GEO)',
+        'Nutzlast/Satellit': 'Payload/satellite',
+        'Raketenk\u00f6rper': 'Rocket body',
+        'Weltraumschrott': 'Space debris',
+        'Unbekanntes Objekt': 'Unknown object',
+        'Kein aktiver Betreiber': 'No active operator',
+        'Nicht katalogisierte Nutzlast/Objekt': 'Uncataloged payload/object',
+        'Raumstation/ISS-Modul': 'Space station/ISS module',
+        'Raumstation/Stationsmodul': 'Space station/station module',
+        'Raumschiff/Versorgung': 'Spacecraft/resupply',
+        'Kommunikationssatellit': 'Communications satellite',
+        'Kommunikations-/Datenrelaissatellit': 'Communications/data relay satellite',
+        'Milit\u00e4rischer Kommunikationssatellit': 'Military communications satellite',
+        'Navigationssatellit': 'Navigation satellite',
+        'Wetter-/Umweltsatellit': 'Weather/environment satellite',
+        'Erdbeobachtung': 'Earth observation',
+        'Radar-Erdbeobachtung': 'Radar Earth observation',
+        'Weltraumteleskop': 'Space telescope',
+        'Wissenschaftssatellit': 'Science satellite',
+        'Milit\u00e4r-/Aufkl\u00e4rungssatellit': 'Military/reconnaissance satellite',
+        'Milit\u00e4r-/Regierungssatellit': 'Military/government satellite',
+        'Regierungs-/Aufkl\u00e4rungssatellit': 'Government/reconnaissance satellite',
+        'Aufkl\u00e4rungssatellit': 'Reconnaissance satellite',
+        'Wetter-/AIS-Datensatellit': 'Weather/AIS data satellite',
+        'RF-Aufkl\u00e4rungssatellit': 'RF reconnaissance satellite',
+        'IoT-Kommunikationssatellit': 'IoT communications satellite',
+        'Europ\u00e4ische Union': 'European Union',
+        'Vereinigtes K\u00f6nigreich': 'United Kingdom',
+        'Vereinigtes K\u00f6nigreich/Frankreich': 'United Kingdom/France',
+        'Russland': 'Russia',
+        'Deutschland': 'Germany',
+        'Frankreich': 'France',
+        'Frankreich/Europa': 'France/Europe',
+        'Kanada': 'Canada',
+        'Spanien': 'Spain',
+        'T\u00fcrkei': 'Turkey',
+        'Saudi-Arabien': 'Saudi Arabia',
+        '\u00c4gypten': 'Egypt',
+        'Finnland': 'Finland',
+        'S\u00fcdkorea': 'South Korea',
+        'Indien': 'India',
+        'Luxemburg': 'Luxembourg',
+        'International': 'International',
+        'Europa': 'Europe',
+        'USA/Europa': 'USA/Europe',
+        'USA/Luxemburg': 'USA/Luxembourg'
+    };
+
+    const STATIC_TEXT_NODE_ORIGINALS = new WeakMap();
+    const STATIC_ATTRIBUTE_ORIGINALS = new WeakMap();
+    const DATE_FORMATTER_CACHE = new Map();
+
+    function normalizeLanguage(language) {
+        return SUPPORTED_LANGUAGES.includes(language) ? language : 'en';
+    }
+
+    function regionFromLocale(locale) {
+        const match = String(locale || '').match(/[-_]([A-Za-z]{2})(?:$|-|_)/);
+        return match ? match[1].toUpperCase() : '';
+    }
+
+    function defaultUiLanguage() {
+        const languages = Array.isArray(navigator.languages) && navigator.languages.length
+            ? navigator.languages
+            : [navigator.language].filter(Boolean);
+        const inDachLocale = languages.some((language) => {
+            const region = regionFromLocale(language);
+            return DACH_REGIONS.has(region);
+        });
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        return inDachLocale || DACH_TIME_ZONES.has(timeZone) ? 'de' : 'en';
+    }
+
+    function currentLanguage() {
+        return normalizeLanguage(state?.panelVisibility?.language || defaultUiLanguage());
+    }
+
+    function currentLocale() {
+        return currentLanguage() === 'de' ? 'de-DE' : 'en-US';
+    }
+
+    function t(key, values = {}) {
+        const table = TEXT[currentLanguage()] || TEXT.en;
+        const fallback = TEXT.en[key] || TEXT.de[key] || key;
+        return String(table[key] || fallback).replace(/\{(\w+)\}/g, (match, name) => (
+            Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
+        ));
+    }
+
+    function formatNumber(value, options = undefined) {
+        return Number(value).toLocaleString(currentLocale(), options);
+    }
+
+    function dateFormatter(key, options) {
+        const cacheKey = `${currentLocale()}|${key}`;
+        if (!DATE_FORMATTER_CACHE.has(cacheKey)) {
+            DATE_FORMATTER_CACHE.set(cacheKey, new Intl.DateTimeFormat(currentLocale(), options));
+        }
+        return DATE_FORMATTER_CACHE.get(cacheKey);
+    }
+
+    function formatLocalDateTime(date) {
+        return dateFormatter('long', {
+            weekday: 'short',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(date);
+    }
+
+    function formatLocalShortDateTime(date) {
+        return dateFormatter('short', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short'
+        }).format(date);
+    }
+
+    function formatLocalTimeOnly(date) {
+        return dateFormatter('time', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(date);
+    }
+
+    function translateDataLabel(value) {
+        if (currentLanguage() !== 'en' || typeof value !== 'string') return value;
+        return DATA_LABEL_TRANSLATIONS_EN[value] || value;
+    }
 
     function getLocalTimeZoneLabel(date = new Date()) {
         try {
-            const part = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+            const part = dateFormatter('zone', { timeZoneName: 'short' })
                 .formatToParts(date)
                 .find((entry) => entry.type === 'timeZoneName');
-            return part?.value || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Lokal';
+            return part?.value || Intl.DateTimeFormat().resolvedOptions().timeZone || (currentLanguage() === 'de' ? 'Lokal' : 'Local');
         } catch (error) {
-            return 'Lokal';
+            return currentLanguage() === 'de' ? 'Lokal' : 'Local';
         }
     }
 
@@ -181,7 +757,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         }
 
         state.satelliteLibraryReady = false;
-        state.satelliteLastError = `Satellitenbibliothek konnte nicht geladen werden (${failedSources.length} CDN-Versuche).`;
+        state.satelliteLastError = t('sat.libraryLoadFailed', { count: failedSources.length });
         return false;
     }
 
@@ -353,7 +929,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             watch: true,
             controls: true,
             orbitRevolutions: SATELLITE_ORBIT_DEFAULT_REVOLUTIONS,
-            launchGroundTrackRevolutions: LAUNCH_GROUND_TRACK_DEFAULT_REVOLUTIONS
+            launchGroundTrackRevolutions: LAUNCH_GROUND_TRACK_DEFAULT_REVOLUTIONS,
+            language: defaultUiLanguage()
         };
         try {
             const raw = localStorage.getItem(UI_STORAGE_KEY);
@@ -361,6 +938,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             const parsed = { ...defaults, ...JSON.parse(raw) };
             parsed.orbitRevolutions = clampSatelliteOrbitRevolutions(parsed.orbitRevolutions);
             parsed.launchGroundTrackRevolutions = clampLaunchGroundTrackRevolutions(parsed.launchGroundTrackRevolutions);
+            parsed.language = normalizeLanguage(parsed.language);
             return parsed;
         } catch (error) {
             return defaults;
@@ -387,12 +965,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function dataAgeLabel(generatedAt) {
         const date = generatedAt ? new Date(generatedAt) : null;
         const savedAt = date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
-        if (!savedAt) return 'noch nicht generiert';
+        if (!savedAt) return t('age.notGenerated');
         const ageMs = Math.max(0, Date.now() - savedAt);
         const minutes = Math.max(1, Math.round(ageMs / 60000));
-        if (minutes < 60) return `${minutes} min alt`;
+        if (minutes < 60) return t('age.minutes', { count: minutes });
         const hours = Math.round(minutes / 60);
-        return `${hours} h alt`;
+        return t('age.hours', { count: hours });
     }
 
     function writeSatelliteCache(rawText) {
@@ -578,6 +1156,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'satellite-orbit-revolutions-readout',
             'launch-ground-track-revolutions',
             'launch-ground-track-revolutions-readout',
+            'language-select',
+            'language-option-en',
+            'language-option-de',
             'launch-stat-total',
             'launch-stat-countdown',
             'launch-stat-orgs',
@@ -687,7 +1268,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     }
 
     function satelliteOrbitRevolutionsLabel(value) {
-        return value === 1 ? '1 Umlauf' : `${value} Umlaeufe`;
+        return value === 1 ? t('orbit.rev.one') : t('orbit.rev.many', { count: value });
     }
 
     function syncSatelliteOrbitSettingsUi() {
@@ -732,6 +1313,96 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         updateSelectedLaunchTrajectory(state.selectedLaunchId || state.launchDetailActive ? getSelectedLaunch() : null);
     }
 
+    function translatedStaticText(originalText) {
+        const trimmed = String(originalText || '').trim();
+        if (!trimmed) return originalText;
+        const translated = STATIC_TRANSLATIONS[currentLanguage()]?.[trimmed];
+        if (!translated) return originalText;
+        const leading = originalText.match(/^\s*/)?.[0] || '';
+        const trailing = originalText.match(/\s*$/)?.[0] || '';
+        return `${leading}${translated}${trailing}`;
+    }
+
+    function applyStaticTranslations() {
+        document.documentElement.lang = currentLanguage();
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (parent.closest('script, style, #launch-feed-items, #satellite-search-results, #stat-insight-body, #mission-timeline-items')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+            }
+        });
+
+        let node = walker.nextNode();
+        while (node) {
+            if (!STATIC_TEXT_NODE_ORIGINALS.has(node)) {
+                STATIC_TEXT_NODE_ORIGINALS.set(node, node.nodeValue);
+            }
+            node.nodeValue = translatedStaticText(STATIC_TEXT_NODE_ORIGINALS.get(node));
+            node = walker.nextNode();
+        }
+
+        document.querySelectorAll('[aria-label], input[placeholder], iframe[title]').forEach((element) => {
+            ['aria-label', 'placeholder', 'title'].forEach((attribute) => {
+                if (!element.hasAttribute(attribute)) return;
+                let originals = STATIC_ATTRIBUTE_ORIGINALS.get(element);
+                if (!originals) {
+                    originals = {};
+                    STATIC_ATTRIBUTE_ORIGINALS.set(element, originals);
+                }
+                if (!Object.prototype.hasOwnProperty.call(originals, attribute)) {
+                    originals[attribute] = element.getAttribute(attribute);
+                }
+                element.setAttribute(attribute, translatedStaticText(originals[attribute]));
+            });
+        });
+    }
+
+    function syncLanguageSettingsUi() {
+        const language = currentLanguage();
+        if (dom['language-select']) {
+            dom['language-select'].textContent = language === 'de' ? t('language.german') : t('language.english');
+        }
+        ['en', 'de'].forEach((option) => {
+            const button = dom[`language-option-${option}`];
+            if (!button) return;
+            button.setAttribute('aria-pressed', String(language === option));
+            button.classList.toggle('active', language === option);
+        });
+    }
+
+    function refreshLanguageDependentUi() {
+        applyStaticTranslations();
+        syncLanguageSettingsUi();
+        syncSatelliteOrbitSettingsUi();
+        syncLaunchGroundTrackSettingsUi();
+        const artemisOpen = dom['toggle-artemis-settings']?.getAttribute('aria-expanded') === 'true';
+        setArtemisSettingsOpen(artemisOpen);
+        refreshSceneModePill();
+        updateLaunchFeedModeUi();
+        renderActiveLaunchFeed();
+        updateOverviewStats();
+        updateLaunchSuccessStatsUi();
+        refreshSelectedLaunchUi();
+        refreshSatelliteFocusVisuals();
+        renderSatelliteSearchResults();
+        renderStatsPanel();
+        buildMissionTimeline();
+        const met = THREE.MathUtils.clamp(ARTEMIS.getMET(sceneTimeMs()), 0, state.totalMissionHours);
+        updateArtemisPanel(met);
+    }
+
+    function setLanguage(language) {
+        const next = normalizeLanguage(language);
+        if (state.panelVisibility.language === next) return;
+        state.panelVisibility.language = next;
+        writeUiState();
+        refreshLanguageDependentUi();
+    }
+
     function openSettings() {
         closeSearch();
         document.body.classList.add('settings-open');
@@ -760,7 +1431,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         dom['artemis-settings-panel']?.classList.toggle('is-collapsed', !open);
         dom['toggle-artemis-settings']?.setAttribute('aria-expanded', String(open));
         if (dom['toggle-artemis-settings']) {
-            dom['toggle-artemis-settings'].textContent = open ? 'Artemis schliessen' : 'Artemis oeffnen';
+            dom['toggle-artemis-settings'].textContent = open ? t('settings.artemis.close') : t('settings.artemis.open');
         }
     }
 
@@ -1051,6 +1722,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         dom['satellite-orbit-revolutions']?.addEventListener('input', onSatelliteOrbitRevolutionsInput);
         dom['launch-ground-track-revolutions']?.addEventListener('input', onLaunchGroundTrackRevolutionsInput);
+        document.querySelectorAll('[data-language-option]').forEach((button) => {
+            button.addEventListener('click', () => setLanguage(button.getAttribute('data-language-option')));
+        });
 
         if (dom['zoom-slider']) {
             dom['zoom-slider'].addEventListener('pointerdown', () => { state.zoomSliderDragging = true; });
@@ -1093,6 +1767,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function init() {
         cacheDom();
+        applyStaticTranslations();
+        syncLanguageSettingsUi();
         applyPanelVisibility();
         syncSatelliteOrbitSettingsUi();
         syncLaunchGroundTrackSettingsUi();
@@ -2136,13 +2812,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function refreshSceneModePill() {
         if (!dom['scene-mode-pill']) return;
         dom['scene-mode-pill'].textContent = state.artemisReplayEnabled
-            ? 'Replay-Modus: Artemis II im Raum aktiv'
-            : 'Home-Modus: Earth Launch Tracker';
+            ? t('scene.replay')
+            : t('scene.home');
         dom['scene-mode-pill'].classList.toggle('status-live', state.artemisReplayEnabled);
         if (dom['toggle-artemis-replay']) {
             dom['toggle-artemis-replay'].textContent = state.artemisReplayEnabled
-                ? 'Replay im Raum an'
-                : 'Replay im Raum aus';
+                ? t('artemis.replay.on')
+                : t('artemis.replay.off');
             dom['toggle-artemis-replay'].classList.toggle('active', state.artemisReplayEnabled);
         }
     }
@@ -2159,7 +2835,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function formatLaunchCountdown(target) {
         if (!target) return '--';
         const diff = target.getTime() - Date.now();
-        if (diff <= 0) return 'Startfenster erreicht';
+        if (diff <= 0) return t('countdown.reached');
         const sec = Math.floor(diff / 1000);
         const days = Math.floor(sec / 86400);
         const hours = Math.floor(sec / 3600) % 24;
@@ -2201,7 +2877,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (lsp?.name) return String(lsp.name).trim();
         const manufacturer = launch?.rocket?.configuration?.manufacturer;
         if (manufacturer?.name) return String(manufacturer.name).trim();
-        return 'Unbekannt';
+        return t('launch.unknownOrg');
     }
 
     function launchKey(launch) {
@@ -2212,7 +2888,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (typeof launch?.pad === 'string' && launch.pad.trim()) {
             return [launch.pad.trim(), launch.padLocation].filter(Boolean).join(' · ');
         }
-        const pad = launch?.pad?.name || 'Unbekanntes Pad';
+        const pad = launch?.pad?.name || t('launch.unknownPad');
         const location = launch?.pad?.location?.name || '';
         return [pad, location].filter(Boolean).join(' · ');
     }
@@ -2221,13 +2897,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (typeof launch?.rocket === 'string' && launch.rocket.trim()) return launch.rocket.trim();
         return launch?.rocket?.configuration?.full_name ||
             launch?.rocket?.configuration?.name ||
-            'Rakete unbekannt';
+            t('launch.unknownRocket');
     }
 
     function launchStatusLabel(launch) {
         if (launch?.statusName) return launch.statusName;
         if (typeof launch?.status === 'string' && launch.status.trim()) return launch.status.trim();
-        return launch?.status?.name || 'Status unbekannt';
+        return launch?.status?.name || t('launch.unknownStatus');
     }
 
     function launchStatusText(launch) {
@@ -2285,17 +2961,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function launchStatusBadge(launch) {
         if (launch?.outcome) {
-            if (launch.outcome === 'success') return { text: 'Erfolgreich', className: 'status-success' };
-            if (launch.outcome === 'failure') return { text: 'Fehlgeschlagen', className: 'status-failure' };
-            if (launch.outcome === 'cancelled') return { text: 'Scrubbed / abgesagt', className: 'status-cancelled' };
-            if (launch.outcome === 'delayed') return { text: 'Verschoben', className: 'status-delayed' };
-            if (launch.outcome === 'go') return { text: 'Go bei T-15', className: 'status-go' };
+            if (launch.outcome === 'success') return { text: t('launch.status.success'), className: 'status-success' };
+            if (launch.outcome === 'failure') return { text: t('launch.status.failure'), className: 'status-failure' };
+            if (launch.outcome === 'cancelled') return { text: t('launch.status.cancelled'), className: 'status-cancelled' };
+            if (launch.outcome === 'delayed') return { text: t('launch.status.delayed'), className: 'status-delayed' };
+            if (launch.outcome === 'go') return { text: t('launch.status.goT15'), className: 'status-go' };
         }
         const status = classifyLaunchStatus(launch);
-        if (status === 'success') return { text: 'Erfolgreich', className: 'status-success' };
-        if (status === 'failure') return { text: 'Fehlgeschlagen', className: 'status-failure' };
-        if (status === 'cancelled') return { text: 'Scrubbed / abgesagt', className: 'status-cancelled' };
-        if (status === 'delayed') return { text: 'Verschoben', className: 'status-delayed' };
+        if (status === 'success') return { text: t('launch.status.success'), className: 'status-success' };
+        if (status === 'failure') return { text: t('launch.status.failure'), className: 'status-failure' };
+        if (status === 'cancelled') return { text: t('launch.status.cancelled'), className: 'status-cancelled' };
+        if (status === 'delayed') return { text: t('launch.status.delayed'), className: 'status-delayed' };
         if (status === 'live') return { text: 'Live', className: 'status-go' };
         if (status === 'go') return { text: 'Go', className: 'status-go' };
         return { text: launchStatusLabel(launch), className: '' };
@@ -2327,7 +3003,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (typeof launch?.mission === 'string' && launch.mission.trim()) return launch.mission.trim();
         return launch?.mission?.description ||
             launch?.mission?.name ||
-            'Zu diesem Start liegt im Feed keine Missionsbeschreibung vor.';
+            t('launch.noStory');
     }
 
     function launchVideoCandidates(launch) {
@@ -2443,18 +3119,18 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!launch) return '--';
         const when = launchInstant(launch);
         const status = classifyLaunchStatus(launch);
-        if (status === 'cancelled') return 'Start abgesagt - Watch bleibt auf rot.';
-        if (status === 'delayed') return 'Start verzoegert oder noch nicht bestaetigt.';
-        if (status === 'failure') return 'Start fehlgeschlagen bestaetigt.';
-        if (status === 'success' || launch?.postflightStatus === 'success') return 'Start erfolgreich bestaetigt.';
-        if (launch?.preflightStatus === 'go' || status === 'live') return 'T-15 vom Worker bestaetigt - Timer ist live-gruen.';
-        if (!when) return 'Monitoring wartet auf eine gueltige Startzeit.';
+        if (status === 'cancelled') return t('launch.intel.cancelled');
+        if (status === 'delayed') return t('launch.intel.delayed');
+        if (status === 'failure') return t('launch.intel.failure');
+        if (status === 'success' || launch?.postflightStatus === 'success') return t('launch.intel.success');
+        if (launch?.preflightStatus === 'go' || status === 'live') return t('launch.intel.go');
+        if (!when) return t('launch.intel.noTime');
 
         const diff = when.getTime() - Date.now();
-        if (diff > LAUNCH_VERIFY_WINDOW_MS) return 'Worker hat T-15 Check vorgemerkt.';
-        if (diff > 0) return launch?.preflightCheckedAt ? 'Preflight-Status aus Worker-Daten geladen.' : 'Worker prueft den T-15 Status.';
-        if (diff > -LAUNCH_SUCCESS_CHECK_DELAY_MS) return 'Startfenster erreicht - Worker prueft T+30.';
-        return launch?.postflightCheckedAt ? 'Postflight-Status aus Worker-Daten geladen.' : 'Worker holt den T+30 Check nach.';
+        if (diff > LAUNCH_VERIFY_WINDOW_MS) return t('launch.intel.t15Queued');
+        if (diff > 0) return launch?.preflightCheckedAt ? t('launch.intel.preflightLoaded') : t('launch.intel.preflightChecking');
+        if (diff > -LAUNCH_SUCCESS_CHECK_DELAY_MS) return t('launch.intel.windowReached');
+        return launch?.postflightCheckedAt ? t('launch.intel.postflightLoaded') : t('launch.intel.postflightChecking');
     }
 
     function updateLaunchStreamUi(launch) {
@@ -2484,10 +3160,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         const searchUrl = launch ? launchStreamSearchUrl(launch) : '#';
         if (stream) {
-            if (stateLabel) stateLabel.textContent = stream.title || 'Offizieller Stream gefunden.';
+            if (stateLabel) stateLabel.textContent = stream.title || t('stream.found');
             if (link) {
                 link.href = streamUrl;
-                link.textContent = 'Livestream oeffnen';
+                link.textContent = t('stream.open');
                 link.classList.remove('is-hidden');
             }
             if (frame) {
@@ -2496,10 +3172,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                 frame.classList.toggle('is-hidden', !embedUrl);
             }
         } else {
-            if (stateLabel) stateLabel.textContent = 'Noch kein offizieller Stream im Feed - Suche vorbereitet.';
+            if (stateLabel) stateLabel.textContent = t('stream.searchReady');
             if (link) {
                 link.href = searchUrl;
-                link.textContent = 'Auf YouTube suchen';
+                link.textContent = t('stream.searchYoutube');
                 link.classList.remove('is-hidden');
             }
             if (frame) {
@@ -2569,7 +3245,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const diff = current - previous;
         if (diff > 0) return { text: `+${diff} vs ${label}`, className: 'up' };
         if (diff < 0) return { text: `${diff} vs ${label}`, className: 'down' };
-        return { text: `gleich vs ${label}`, className: 'even' };
+        return { text: t('stats.deltaSame', { label }), className: 'even' };
     }
 
     function setStatDelta(id, delta) {
@@ -2688,7 +3364,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const svg = document.createElementNS(svgNs, 'svg');
         svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
         svg.setAttribute('role', 'img');
-        svg.setAttribute('aria-label', 'Live getrackte Satelliten im Verlauf');
+        svg.setAttribute('aria-label', t('stats.chart.satHistory'));
 
         const gridTop = document.createElementNS(svgNs, 'line');
         gridTop.setAttribute('x1', String(padding.left));
@@ -2731,8 +3407,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         });
 
         [
-            { text: max.toLocaleString('de-DE'), y: padding.top + 4 },
-            { text: min.toLocaleString('de-DE'), y: padding.top + plotHeight }
+            { text: formatNumber(max), y: padding.top + 4 },
+            { text: formatNumber(min), y: padding.top + plotHeight }
         ].forEach((label) => {
             const text = document.createElementNS(svgNs, 'text');
             text.setAttribute('x', '2');
@@ -2791,13 +3467,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const successful = successfulLaunchHistoryForStats();
         if (period === 'week') {
             const bounds = periodBounds(now, 'week');
-            const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+            const weekday = new Intl.DateTimeFormat(currentLocale(), { weekday: 'short' });
             return Array.from({ length: 7 }, (_, index) => {
                 const start = addDays(bounds.currentStart, index);
                 const end = addDays(start, 1);
                 return {
                     label: weekday.format(start).replace('.', ''),
-                    title: localShortDateTime.format(start),
+                    title: formatLocalShortDateTime(start),
                     value: successful.filter((entry) => entry.when >= start && entry.when < end).length
                 };
             });
@@ -2813,14 +3489,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                 const showLabel = index === 0 || index === days - 1 || start.getDate() % 5 === 0;
                 return {
                     label: showLabel ? String(start.getDate()) : '',
-                    title: localShortDateTime.format(start),
+                    title: formatLocalShortDateTime(start),
                     value: successful.filter((entry) => entry.when >= start && entry.when < dayEnd).length
                 };
             });
         }
 
         const bounds = periodBounds(now, 'year');
-        const monthLabel = new Intl.DateTimeFormat(undefined, { month: 'short' });
+        const monthLabel = new Intl.DateTimeFormat(currentLocale(), { month: 'short' });
         return Array.from({ length: 12 }, (_, index) => {
             const start = new Date(bounds.currentStart);
             start.setMonth(index, 1);
@@ -2835,29 +3511,29 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function renderLaunchPeriodStats(period) {
         const titleByPeriod = {
-            week: 'Erfolgreich Woche',
-            month: 'Erfolgreich Monat',
-            year: 'Erfolgreich Jahr'
+            week: t('stats.title.week'),
+            month: t('stats.title.month'),
+            year: t('stats.title.year')
         };
         const previousLabelByPeriod = {
-            week: 'Vorwoche',
-            month: 'Vormonat',
-            year: 'Vorjahr'
+            week: t('stats.previous.week'),
+            month: t('stats.previous.month'),
+            year: t('stats.previous.year')
         };
         const stats = state.launchSuccessStats?.[period] || launchSuccessStatsFromItems(state.launchHistoryItems)[period];
         const body = dom['stat-insight-body'];
-        dom['stat-insight-title'].textContent = titleByPeriod[period] || 'Erfolgreiche Starts';
+        dom['stat-insight-title'].textContent = titleByPeriod[period] || t('stats.title.success');
         dom['stat-insight-subtitle'].textContent = state.launchHistoryLoading
-            ? 'Starthistorie wird geladen'
-            : `Verlauf aus ${state.launchHistoryItems.length} gespeicherten Starts`;
+            ? t('stats.subtitle.loadingHistory')
+            : t('stats.subtitle.history', { count: state.launchHistoryItems.length });
         body.replaceChildren();
         appendStatSummary(body, [
-            { label: 'Aktuell', value: Number.isFinite(stats?.current) ? String(stats.current) : '--' },
+            { label: t('stats.metric.current'), value: Number.isFinite(stats?.current) ? String(stats.current) : '--' },
             { label: previousLabelByPeriod[period], value: Number.isFinite(stats?.previous) ? String(stats.previous) : '--' }
         ]);
         appendBarChart(body, launchPeriodSeries(period));
         if (!state.launchHistoryItems.length && state.launchHistoryLoading) {
-            appendEmptyStat(body, 'Lade Startdaten fuer den Verlauf ...');
+            appendEmptyStat(body, t('stats.empty.loadingTrend'));
         }
     }
 
@@ -2868,7 +3544,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         launchHistoryForStats().forEach(({ launch, when }) => {
             const time = when.getTime();
             if (time < since || time > now) return;
-            const provider = launchOrganization(launch) || 'Unbekannt';
+            const provider = launchOrganization(launch) || t('common.unknown');
             providerCounts.set(provider, (providerCounts.get(provider) || 0) + 1);
         });
 
@@ -2877,17 +3553,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             .slice(0, 12);
         const total = Array.from(providerCounts.values()).reduce((sum, count) => sum + count, 0);
         const body = dom['stat-insight-body'];
-        dom['stat-insight-title'].textContent = 'Anbieter';
-        dom['stat-insight-subtitle'].textContent = `Gesamtstarts der letzten ${PROVIDER_STATS_WINDOW_DAYS} Tage`;
+        dom['stat-insight-title'].textContent = t('stats.title.providers');
+        dom['stat-insight-subtitle'].textContent = t('stats.subtitle.providers', { days: PROVIDER_STATS_WINDOW_DAYS });
         body.replaceChildren();
         appendStatSummary(body, [
-            { label: 'Gesamt', value: total.toLocaleString('de-DE') },
-            { label: 'Anbieter', value: providerCounts.size.toLocaleString('de-DE') }
+            { label: t('stats.metric.total'), value: formatNumber(total) },
+            { label: t('stats.metric.providers'), value: formatNumber(providerCounts.size) }
         ]);
         if (rows.length) {
             appendRanking(body, rows);
         } else {
-            appendEmptyStat(body, state.launchHistoryLoading ? 'Lade Anbieterstatistik ...' : 'Keine Starts in den letzten 100 Tagen gefunden.');
+            appendEmptyStat(body, state.launchHistoryLoading ? t('stats.empty.providersLoading') : t('stats.empty.providersNone'));
         }
     }
 
@@ -2897,26 +3573,26 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const current = state.satelliteCatalogLoaded ? state.satelliteLiveCount : null;
         const oldest = history[0]?.time || Date.now();
         const latest = history[history.length - 1]?.time || Date.now();
-        dom['stat-insight-title'].textContent = 'Live getrackt';
+        dom['stat-insight-title'].textContent = t('stats.title.live');
         dom['stat-insight-subtitle'].textContent = history.length > 1
-            ? `${localShortDateTime.format(new Date(oldest))} bis ${localShortDateTime.format(new Date(latest))}`
-            : 'Globaler Worker-Verlauf';
+            ? t('time.range', { start: formatLocalShortDateTime(new Date(oldest)), end: formatLocalShortDateTime(new Date(latest)) })
+            : t('stats.subtitle.workerGlobal');
         body.replaceChildren();
         appendStatSummary(body, [
-            { label: 'Jetzt', value: Number.isFinite(current) ? current.toLocaleString('de-DE') : '--' },
-            { label: 'Samples', value: history.length.toLocaleString('de-DE') }
+            { label: t('stats.metric.now'), value: Number.isFinite(current) ? formatNumber(current) : '--' },
+            { label: t('stats.metric.samples'), value: formatNumber(history.length) }
         ]);
         if (history.length) {
             const series = history.slice(-48).map((sample, index, samples) => ({
                 label: index === 0 || index === samples.length - 1 || index % 8 === 0
-                    ? localTimeOnly.format(new Date(sample.time)).slice(0, 5)
+                    ? formatLocalTimeOnly(new Date(sample.time)).slice(0, 5)
                     : '',
-                title: localShortDateTime.format(new Date(sample.time)),
+                title: formatLocalShortDateTime(new Date(sample.time)),
                 value: sample.liveCount
             }));
             appendLineChart(body, series);
         } else {
-            appendEmptyStat(body, 'Noch keine globale Satellitenhistorie geladen.');
+            appendEmptyStat(body, t('stats.empty.satHistory'));
         }
     }
 
@@ -3002,9 +3678,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         dom['launch-stat-success-week'].textContent = String(stats.week.current);
         dom['launch-stat-success-month'].textContent = String(stats.month.current);
         dom['launch-stat-success-year'].textContent = String(stats.year.current);
-        setStatDelta('launch-stat-success-week-delta', formatLaunchDelta(stats.week.current, stats.week.previous, 'Vorwoche'));
-        setStatDelta('launch-stat-success-month-delta', formatLaunchDelta(stats.month.current, stats.month.previous, 'Vormonat'));
-        setStatDelta('launch-stat-success-year-delta', formatLaunchDelta(stats.year.current, stats.year.previous, 'Vorjahr'));
+        setStatDelta('launch-stat-success-week-delta', formatLaunchDelta(stats.week.current, stats.week.previous, t('stats.previous.week')));
+        setStatDelta('launch-stat-success-month-delta', formatLaunchDelta(stats.month.current, stats.month.previous, t('stats.previous.month')));
+        setStatDelta('launch-stat-success-year-delta', formatLaunchDelta(stats.year.current, stats.year.previous, t('stats.previous.year')));
         if (state.statsPanelOpen && state.statsPanelMode.startsWith('launch-')) renderStatsPanel();
     }
 
@@ -3024,7 +3700,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!items.length && state.launchHistoryLoading) {
             const loading = document.createElement('div');
             loading.className = 'launch-empty';
-            loading.textContent = 'Lade Starthistorie ...';
+            loading.textContent = t('launch.historyLoading');
             dom['launch-feed-items'].appendChild(loading);
             return;
         }
@@ -3032,7 +3708,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!items.length) {
             const empty = document.createElement('div');
             empty.className = 'launch-empty';
-            empty.textContent = state.launchHistoryError || 'Noch keine historischen Starts geladen.';
+            empty.textContent = state.launchHistoryError || t('launch.historyEmpty');
             dom['launch-feed-items'].appendChild(empty);
             return;
         }
@@ -3045,7 +3721,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
             const title = document.createElement('div');
             title.className = 'launch-title';
-            title.textContent = launch.name || 'Unbenannter Start';
+            title.textContent = launch.name || t('launch.unnamed');
 
             const meta = document.createElement('div');
             meta.className = 'launch-provider';
@@ -3062,7 +3738,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             const when = document.createElement('div');
             when.className = 'launch-net';
             const launchDate = launchInstant(launch);
-            when.textContent = launchDate ? localShortDateTime.format(launchDate) : '--';
+            when.textContent = launchDate ? formatLocalShortDateTime(launchDate) : '--';
 
             const badgeData = launchStatusBadge(launch);
             const badge = document.createElement('div');
@@ -3081,7 +3757,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (state.launchHistoryLoading || !state.launchHistoryDone) {
             const footer = document.createElement('div');
             footer.className = 'launch-history-footer';
-            footer.textContent = state.launchHistoryLoading ? 'Laedt weitere Historie ...' : 'Weiter scrollen fuer aeltere Starts';
+            footer.textContent = state.launchHistoryLoading ? t('launch.historyMoreLoading') : t('launch.historyMoreHint');
             dom['launch-feed-items'].appendChild(footer);
         }
     }
@@ -3089,10 +3765,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function updateLaunchHistoryStatus() {
         if (state.launchFeedMode !== 'history') return;
         if (state.launchHistoryError) {
-            setLaunchFeedStatus(`Starthistorie wartet (${state.launchHistoryError})`);
+            setLaunchFeedStatus(t('launch.historyWaiting', { error: state.launchHistoryError }));
             return;
         }
-        setLaunchFeedStatus(`Worker-Historie · ${state.launchHistoryItems.length} beobachtete Starts`);
+        setLaunchFeedStatus(t('launch.historyStatus', { count: state.launchHistoryItems.length }));
     }
 
     async function fetchLaunchHistoryPage() {
@@ -3115,7 +3791,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             state.launchHistoryDone = true;
             state.launchHistoryError = '';
         } catch (error) {
-            state.launchHistoryError = error?.message || 'Statische Historie nicht erreichbar';
+            state.launchHistoryError = error?.message || t('launch.staticHistoryUnavailable');
         } finally {
             state.launchHistoryLoading = false;
             updateLaunchHistoryStatus();
@@ -3144,8 +3820,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             fetchLaunchHistoryPage(true);
         } else if (mode === 'upcoming') {
             setLaunchFeedStatus(state.launches.length
-                ? `Worker-Daten · ${dataAgeLabel(state.launchDataGeneratedAt)} · ${state.launches.length} Starts`
-                : 'Lade Startdaten ...');
+                ? t('launch.workerStatus', { age: dataAgeLabel(state.launchDataGeneratedAt), count: state.launches.length })
+                : t('launch.loading'));
         }
     }
 
@@ -3160,7 +3836,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!items.length) {
             const empty = document.createElement('div');
             empty.className = 'launch-empty';
-            empty.textContent = 'Keine anstehenden Earth-Launches mit Koordinaten gefunden.';
+            empty.textContent = t('launch.noUpcoming');
             dom['launch-feed-items'].appendChild(empty);
             return;
         }
@@ -3173,7 +3849,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
             const title = document.createElement('div');
             title.className = 'launch-title';
-            title.textContent = launch.name || 'Unbenannter Start';
+            title.textContent = launch.name || t('launch.unnamed');
 
             const provider = document.createElement('div');
             provider.className = 'launch-provider';
@@ -3190,7 +3866,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             const net = document.createElement('div');
             net.className = 'launch-net';
             const launchDate = launchInstant(launch);
-            net.textContent = launchDate ? localShortDateTime.format(launchDate) : '--';
+            net.textContent = launchDate ? formatLocalShortDateTime(launchDate) : '--';
 
             const countdown = document.createElement('div');
             countdown.className = 'launch-countdown';
@@ -3269,14 +3945,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!launch) {
             updateLaunchStreamUi(null);
             clearLaunchTrajectory();
-            if (dom['watch-launch-title']) dom['watch-launch-title'].textContent = 'Ausgewaehlter Start';
+            if (dom['watch-launch-title']) dom['watch-launch-title'].textContent = t('launch.selected');
             if (dom['watch-launch-subtitle']) dom['watch-launch-subtitle'].textContent = '--';
-            if (dom['watch-launch-intel']) dom['watch-launch-intel'].textContent = 'Waehle rechts im Launch Feed einen Start aus.';
+            if (dom['watch-launch-intel']) dom['watch-launch-intel'].textContent = t('launch.chooseFromFeed');
             return;
         }
 
         const when = launchInstant(launch);
-        dom['watch-launch-title'].textContent = launch.name || 'Unbenannter Start';
+        dom['watch-launch-title'].textContent = launch.name || t('launch.unnamed');
         dom['watch-launch-subtitle'].textContent =
             launch?.padLocation ||
             launch?.orbit ||
@@ -3290,7 +3966,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         applyLaunchStatusClass(dom['watch-launch-status'], launch);
         applyLaunchStatusClass(dom['watch-launch-countdown'], launch);
         dom['watch-launch-pad'].textContent = launchPadLabel(launch);
-        dom['watch-launch-window'].textContent = when ? localShortDateTime.format(when) : '--';
+        dom['watch-launch-window'].textContent = when ? formatLocalShortDateTime(when) : '--';
         dom['watch-launch-coords'].textContent = formatCoordinates(launch);
         dom['watch-launch-story'].textContent = launchStory(launch);
         if (dom['watch-launch-intel']) dom['watch-launch-intel'].textContent = launchIntelText(launch);
@@ -3344,7 +4020,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     }
 
     async function fetchLaunches() {
-        if (state.launchFeedMode === 'upcoming') setLaunchFeedStatus('Lade Startdaten ...');
+        if (state.launchFeedMode === 'upcoming') setLaunchFeedStatus(t('launch.loading'));
 
         try {
             const payload = await fetchStaticJson(LAUNCH_FEED_DATA_URL);
@@ -3378,7 +4054,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             rebuildLaunchMarkers();
 
             if (state.launchFeedMode === 'upcoming') {
-                setLaunchFeedStatus(`Worker-Daten · ${dataAgeLabel(state.launchDataGeneratedAt)} · ${state.launches.length} Starts`);
+                setLaunchFeedStatus(t('launch.workerStatus', { age: dataAgeLabel(state.launchDataGeneratedAt), count: state.launches.length }));
             }
         } catch (error) {
             state.launches = [];
@@ -3390,7 +4066,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             updateOverviewStats();
             rebuildLaunchMarkers();
             if (state.launchFeedMode === 'upcoming') {
-                setLaunchFeedStatus(`Statische Startdaten nicht erreichbar${error?.message ? ` (${error.message})` : '.'}`);
+                setLaunchFeedStatus(`${t('launch.staticUnavailable')}${error?.message ? ` (${error.message})` : '.'}`);
             }
         }
     }
@@ -3980,11 +4656,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function updateSatelliteSearchStatus() {
         if (!dom['satellite-search-status']) return;
         if (!state.satelliteLibraryReady) {
-            dom['satellite-search-status'].textContent = state.satelliteLastError || 'Die Satellitenbibliothek konnte nicht geladen werden.';
+            dom['satellite-search-status'].textContent = state.satelliteLastError || t('sat.libraryMissing');
             return;
         }
         if (!state.satelliteCatalogLoaded) {
-            dom['satellite-search-status'].textContent = state.satelliteLastError || 'Lade Satellitenkatalog ...';
+            dom['satellite-search-status'].textContent = state.satelliteLastError || t('sat.catalogLoading');
             return;
         }
 
@@ -3993,19 +4669,23 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             return;
         }
 
-        const enabled = ORBIT_REGIMES.filter((regime) => orbitRegimeActive(regime)).join(', ') || 'keine';
-        dom['satellite-search-status'].textContent =
-            `${estimateSatelliteOrbitTotal().toLocaleString('de-DE')} im Orbit geschaetzt · ${state.satelliteCatalog.length.toLocaleString('de-DE')} oeffentlich trackbar · ${state.satelliteLiveCount.toLocaleString('de-DE')} live sichtbar · Filter: ${enabled}`;
+        const enabled = ORBIT_REGIMES.filter((regime) => orbitRegimeActive(regime)).join(', ') || t('common.none');
+        dom['satellite-search-status'].textContent = t('sat.catalogReady', {
+            total: formatNumber(estimateSatelliteOrbitTotal()),
+            trackable: formatNumber(state.satelliteCatalog.length),
+            live: formatNumber(state.satelliteLiveCount),
+            enabled
+        });
     }
 
     function formatAltitudeKm(value) {
         if (!Number.isFinite(value)) return '--';
-        return `${Math.round(value).toLocaleString('de-DE')} km`;
+        return `${formatNumber(Math.round(value))} km`;
     }
 
     function formatSatelliteNumber(value, fractionDigits = 0, suffix = '') {
         if (!Number.isFinite(value)) return '--';
-        return `${value.toLocaleString('de-DE', {
+        return `${formatNumber(value, {
             minimumFractionDigits: fractionDigits,
             maximumFractionDigits: fractionDigits
         })}${suffix}`;
@@ -4020,7 +4700,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function formatSatelliteSize(satellite) {
         if (satellite?.sizeLabel) return satellite.sizeLabel;
         if (Number.isFinite(satellite?.rcsSquareMeters)) {
-            return `RCS ${formatSatelliteNumber(satellite.rcsSquareMeters, 2)} m2 (keine Baugröße)`;
+            return `RCS ${formatSatelliteNumber(satellite.rcsSquareMeters, 2)} m2 (${t('sat.rcsNoSize')})`;
         }
         return '--';
     }
@@ -4028,11 +4708,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     function formatCoordinate(value, positive, negative) {
         if (!Number.isFinite(value)) return '--';
         const hemisphere = value >= 0 ? positive : negative;
-        return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${hemisphere}`;
+        return `${formatNumber(Math.abs(value), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}° ${hemisphere}`;
     }
 
     function setText(id, value) {
-        if (dom[id]) dom[id].textContent = value;
+        if (dom[id]) dom[id].textContent = translateDataLabel(value);
     }
 
     function currentSatelliteSearchResults() {
@@ -4052,7 +4732,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
                 const aScore = a.name.toLowerCase() === query ? 2 : a.name.toLowerCase().startsWith(query) ? 1 : 0;
                 const bScore = b.name.toLowerCase() === query ? 2 : b.name.toLowerCase().startsWith(query) ? 1 : 0;
                 if (aScore !== bScore) return bScore - aScore;
-                return a.name.localeCompare(b.name, 'de');
+                return a.name.localeCompare(b.name, currentLocale());
             })
             .slice(0, SATELLITE_RESULT_LIMIT);
     }
@@ -4065,7 +4745,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!state.satelliteCatalogLoaded) {
             const empty = document.createElement('div');
             empty.className = 'search-empty';
-            empty.textContent = 'Sobald der oeffentliche Satellitenkatalog geladen ist, erscheinen hier Treffer.';
+            empty.textContent = t('sat.catalogIntro');
             dom['satellite-search-results'].appendChild(empty);
             return;
         }
@@ -4074,7 +4754,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (!results.length) {
             const empty = document.createElement('div');
             empty.className = 'search-empty';
-            empty.textContent = 'Kein oeffentlich trackbarer Satellit passt gerade zu deiner Suche.';
+            empty.textContent = t('sat.noResults');
             dom['satellite-search-results'].appendChild(empty);
             return;
         }
@@ -4090,7 +4770,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
             const meta = document.createElement('div');
             meta.className = 'sat-result-meta';
-            meta.textContent = `${satellite.regime} · ${satellite.type || 'Satellit'} · ${satellite.operator || 'Profil ausstehend'} · Hoehe ${formatAltitudeKm(satellite.altitudeKm)} · NORAD ${satellite.id}`;
+            meta.textContent = `${satellite.regime} | ${translateDataLabel(satellite.type || t('sat.typeFallback'))} | ${translateDataLabel(satellite.operator || t('sat.profilePending'))} | ${t('sat.height')} ${formatAltitudeKm(satellite.altitudeKm)} | NORAD ${satellite.id}`;
 
             const actions = document.createElement('div');
             actions.className = 'sat-result-actions';
@@ -4098,13 +4778,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             const focusBtn = document.createElement('button');
             focusBtn.type = 'button';
             focusBtn.className = 'action-btn';
-            focusBtn.textContent = 'Fokus';
+            focusBtn.textContent = t('sat.focus');
             focusBtn.addEventListener('click', () => focusSatelliteById(satellite.id, false));
 
             const followBtn = document.createElement('button');
             followBtn.type = 'button';
             followBtn.className = 'action-btn';
-            followBtn.textContent = state.followSatelliteId === satellite.id ? 'Verfolgung an' : 'Folgen';
+            followBtn.textContent = state.followSatelliteId === satellite.id ? t('sat.following') : t('sat.follow');
             if (state.followSatelliteId === satellite.id) followBtn.classList.add('active');
             followBtn.addEventListener('click', () => focusSatelliteById(satellite.id, true));
 
@@ -4128,9 +4808,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function baseSatelliteProfile(regime) {
         return satelliteProfile(
-            regime === 'GEO' ? 'Satellit (GEO)' : 'Satellit',
-            'SATCAT-Abfrage ausstehend',
-            'SATCAT-Abfrage ausstehend',
+            regime === 'GEO' ? t('sat.typeGeo') : t('sat.typeFallback'),
+            t('sat.satcatPending'),
+            t('sat.satcatPending'),
             'TLE/NORAD'
         );
     }
@@ -4302,13 +4982,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function satcatOwnerLabel(owner) {
         const code = String(owner || '').trim().toUpperCase();
-        return SATCAT_COUNTRY_OVERRIDES[code] || SATCAT_OWNER_LABELS[code] || code || 'Nicht eindeutig';
+        return SATCAT_COUNTRY_OVERRIDES[code] || SATCAT_OWNER_LABELS[code] || code || t('sat.notClear');
     }
 
     function satelliteOperatorFallback(owner) {
         const code = String(owner || '').trim().toUpperCase();
         if (SATCAT_OPERATOR_LABELS[code]) return SATCAT_OPERATOR_LABELS[code];
-        return code ? 'Nicht eindeutig' : 'Profil ausstehend';
+        return code ? t('sat.notClear') : t('sat.profilePending');
     }
 
     function satelliteNameOperatorProfile(name) {
@@ -4327,11 +5007,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     function satcatTypeLabel(type) {
         const code = String(type || '').trim().toUpperCase();
-        if (code === 'PAY') return 'Nutzlast/Satellit';
-        if (code === 'R/B') return 'Raketenkörper';
-        if (code === 'DEB') return 'Weltraumschrott';
-        if (code === 'UNK') return 'Unbekanntes Objekt';
-        return code || 'Satellit';
+        if (code === 'PAY') return t('satcat.payload');
+        if (code === 'R/B') return t('satcat.rocketBody');
+        if (code === 'DEB') return t('satcat.debris');
+        if (code === 'UNK') return t('satcat.unknownObject');
+        return code || t('sat.typeFallback');
     }
 
     function parseSatelliteFloat(value) {
@@ -4507,7 +5187,7 @@ LIMIT 1`;
         }
         if (state.satelliteProfilePending.has(key)) return state.satelliteProfilePending.get(key);
 
-        satellite.profileSource = 'SATCAT/Wikidata-Abfrage laeuft';
+        satellite.profileSource = t('profile.queryRunning');
         updateSatelliteFocusPanel(satellite);
         const pending = fetchSatelliteProfileData(satellite)
             .then((payload) => {
@@ -4518,7 +5198,7 @@ LIMIT 1`;
                 return satellite;
             })
             .catch((error) => {
-                satellite.profileSource = `TLE/NORAD · Profil offline (${error.message || 'unbekannt'})`;
+                satellite.profileSource = t('profile.offline', { error: error.message || t('sat.unknownError') });
                 if (state.followSatelliteId === satellite.id) updateSatelliteFocusPanel(satellite);
                 return satellite;
             })
@@ -4532,15 +5212,15 @@ LIMIT 1`;
     function inferSatelliteProfile(name, regime) {
         const n = name.toUpperCase();
         const fallback = satelliteProfile(
-            regime === 'GEO' ? 'Satellit (GEO)' : 'Satellit',
-            'Nicht eindeutig',
-            'Nicht eindeutig',
-            'TLE ohne Betreiberfeld'
+            regime === 'GEO' ? t('sat.typeGeo') : t('sat.typeFallback'),
+            t('sat.notClear'),
+            t('sat.notClear'),
+            t('sat.tleNoOperator')
         );
 
-        if (/\b(DEB|DEBRIS)\b/.test(n)) return satelliteProfile('Weltraumschrott', 'Kein aktiver Betreiber', 'Nicht eindeutig', 'TLE-Name');
-        if (/\b(R\/B|ROCKET BODY)\b/.test(n)) return satelliteProfile('Raketenkörper', 'Kein aktiver Betreiber', 'Nicht eindeutig', 'TLE-Name');
-        if (/OBJECT\s+[A-Z0-9]+/.test(n)) return satelliteProfile('Nicht katalogisierte Nutzlast/Objekt', 'Nicht eindeutig', 'Nicht eindeutig', 'TLE-Name');
+        if (/\b(DEB|DEBRIS)\b/.test(n)) return satelliteProfile(t('profile.spaceDebris'), t('profile.noActiveOperator'), t('sat.notClear'), t('profile.tleName'));
+        if (/\b(R\/B|ROCKET BODY)\b/.test(n)) return satelliteProfile(t('profile.rocketBody'), t('profile.noActiveOperator'), t('sat.notClear'), t('profile.tleName'));
+        if (/OBJECT\s+[A-Z0-9]+/.test(n)) return satelliteProfile(t('profile.uncataloged'), t('sat.notClear'), t('sat.notClear'), t('profile.tleName'));
 
         const knownProfiles = [
             [/ISS|ZARYA|UNITY|ZVEZDA|DESTINY|KIBO|COLUMBUS/, 'Raumstation/ISS-Modul', 'ISS-Partner (NASA, Roskosmos, ESA, JAXA, CSA)', 'International'],
@@ -4599,7 +5279,7 @@ LIMIT 1`;
 
         const match = knownProfiles.find(([pattern]) => pattern.test(n));
         if (!match) return fallback;
-        return satelliteProfile(match[1], match[2], match[3], 'Aus Name abgeleitet');
+        return satelliteProfile(translateDataLabel(match[1]), translateDataLabel(match[2]), translateDataLabel(match[3]), t('profile.fromName'));
     }
 
     function parseSatelliteCatalog(rawText) {
@@ -4730,7 +5410,7 @@ LIMIT 1`;
         if (!dom['satellite-focus-panel']) return;
         if (!satellite) {
             setText('sat-focus-title', '--');
-            setText('sat-focus-subtitle', 'Keine Verfolgung aktiv');
+            setText('sat-focus-subtitle', t('sat.noActiveFollow'));
             [
                 'sat-focus-type',
                 'sat-focus-operator',
@@ -4957,10 +5637,10 @@ LIMIT 1`;
 
     function updateSatelliteStats() {
         dom['sat-stat-total'].textContent = state.satelliteCatalogLoaded
-            ? estimateSatelliteOrbitTotal().toLocaleString('de-DE')
+            ? formatNumber(estimateSatelliteOrbitTotal())
             : '--';
         dom['sat-stat-live'].textContent = state.satelliteCatalogLoaded
-            ? state.satelliteLiveCount.toLocaleString('de-DE')
+            ? formatNumber(state.satelliteLiveCount)
             : '--';
         updateSatelliteSearchStatus();
     }
@@ -5023,7 +5703,7 @@ LIMIT 1`;
             state.satelliteCatalog = [];
             state.satelliteCatalogLoaded = false;
             state.satelliteLiveCount = 0;
-            state.satelliteLastError = state.satelliteLastError || 'Satellitenbibliothek nicht verfuegbar.';
+            state.satelliteLastError = state.satelliteLastError || t('sat.libraryUnavailable');
             rebuildSatelliteLayer();
             updateSatelliteStats();
             renderSatelliteSearchResults();
@@ -5037,7 +5717,7 @@ LIMIT 1`;
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const rawText = await response.text();
-            if (!rawText.trim()) throw new Error('statischer Satellitenkatalog leer');
+            if (!rawText.trim()) throw new Error(t('sat.staticCatalogEmpty'));
             writeSatelliteCache(rawText);
             state.satelliteCatalog = parseSatelliteCatalog(rawText);
             state.satelliteCatalogLoaded = true;
@@ -5050,7 +5730,7 @@ LIMIT 1`;
             if (cached?.rawText) {
                 state.satelliteCatalog = parseSatelliteCatalog(cached.rawText);
                 state.satelliteCatalogLoaded = true;
-                state.satelliteLastError = `Satelliten aus lokalem Cache · Live-Quelle aktuell nicht erreichbar (${error.message || 'unbekannter Fehler'}).`;
+                state.satelliteLastError = t('sat.cacheFallback', { error: error.message || t('sat.unknownError') });
                 rebuildSatelliteLayer();
                 propagateSatellites(true);
                 renderSatelliteSearchResults();
@@ -5060,7 +5740,7 @@ LIMIT 1`;
             state.satelliteCatalog = [];
             state.satelliteCatalogLoaded = false;
             state.satelliteLiveCount = 0;
-            state.satelliteLastError = `Satellitenkatalog konnte nicht geladen werden (${error.message || 'unbekannter Fehler'}).`;
+            state.satelliteLastError = t('sat.catalogLoadFailed', { error: error.message || t('sat.unknownError') });
             rebuildSatelliteLayer();
             updateSatelliteStats();
             renderSatelliteSearchResults();
@@ -5405,7 +6085,7 @@ LIMIT 1`;
 
     function formatWarpLabel(value) {
         const absolute = Math.abs(value);
-        const core = absolute >= 1000 ? absolute.toLocaleString('de-DE') : String(absolute);
+        const core = absolute >= 1000 ? formatNumber(absolute) : String(absolute);
         return `${value < 0 ? '-' : ''}${core}x`;
     }
 
@@ -5541,6 +6221,41 @@ LIMIT 1`;
         syncMissionSlider();
     }
 
+    function localizeMissionText(name) {
+        const missionMap = new Map([
+            ['Vor dem Start', 'mission.beforeStart'],
+            ['Start & Erdorbit', 'mission.phase.earthOrbit'],
+            ['Hochelliptischer Orbit', 'mission.phase.highOrbit'],
+            ['TLI-Burn & Erdabflug', 'mission.phase.tli'],
+            ['Mondtransit (Hinflug)', 'mission.phase.outbound'],
+            ['Mond-Flyby', 'mission.phase.flyby'],
+            ['Rücktransit zur Erde', 'mission.phase.return'],
+            ['Wiedereintritt & Landung', 'mission.phase.entry'],
+            ['Booster-Abtrennung (SRB)', 'mission.milestone.boosterSep'],
+            ['ICPS-Abtrennung', 'mission.milestone.icpsSep'],
+            ['Perigäum-Anhebung (PRM)', 'mission.milestone.prm'],
+            ['Apogäum-Anhebung (ARB)', 'mission.milestone.arb'],
+            ['Proximity-Ops-Test mit ICPS', 'mission.milestone.icpsProximity'],
+            ['Perigäum-Korrektur (PRB)', 'mission.milestone.prb'],
+            ['TLI-Burn (Mondkurs)', 'mission.milestone.tli'],
+            ['Outbound-Kurskorrektur OTC-1', 'mission.milestone.otc1'],
+            ['Outbound-Kurskorrektur OTC-2', 'mission.milestone.otc2'],
+            ['Annäherung an den Mond', 'mission.milestone.moonApproach'],
+            ['Funkverlust (Mondrückseite)', 'mission.milestone.signalLoss'],
+            ['Nächste Mondannäherung', 'mission.milestone.closestMoon'],
+            ['Funkkontakt wiederhergestellt', 'mission.milestone.signalReturn'],
+            ['Mond-Flyby abgeschlossen', 'mission.milestone.flybyComplete'],
+            ['Return-Kurskorrektur RTC-1', 'mission.milestone.rtc1'],
+            ['Return-Kurskorrektur RTC-2', 'mission.milestone.rtc2'],
+            ['Service-Modul-Abtrennung', 'mission.milestone.serviceModuleSep'],
+            ['Wiedereintritt (Entry Interface)', 'mission.milestone.reentry'],
+            ['Fallschirm-Entfaltung', 'mission.milestone.parachute'],
+            ['Splashdown im Pazifik', 'mission.milestone.splashdown']
+        ]);
+        const key = missionMap.get(name);
+        return key ? t(key) : name;
+    }
+
     function buildMissionTimeline() {
         if (!dom['mission-timeline-items']) return;
         dom['mission-timeline-items'].innerHTML = '';
@@ -5555,7 +6270,7 @@ LIMIT 1`;
 
             const content = document.createElement('div');
             const title = document.createElement('strong');
-            title.textContent = milestone.name;
+            title.textContent = localizeMissionText(milestone.name);
             const timing = document.createElement('span');
             timing.textContent = `T+ ${formatTimerLabel(milestone.t)}`;
 
@@ -5606,7 +6321,7 @@ LIMIT 1`;
 
     function formatDistance(km) {
         if (!Number.isFinite(km)) return '--';
-        if (km >= 1000) return `${Math.round(km).toLocaleString('de-DE')} km`;
+        if (km >= 1000) return `${formatNumber(Math.round(km))} km`;
         return `${km.toFixed(0)} km`;
     }
 
@@ -5637,8 +6352,8 @@ LIMIT 1`;
 
         dom['met-clock'].textContent =
             `T+ ${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        dom['mission-phase'].textContent = phase.name;
-        dom['mission-date'].textContent = localDateTime.format(new Date(sceneTimeMs()));
+        dom['mission-phase'].textContent = localizeMissionText(phase.name);
+        dom['mission-date'].textContent = formatLocalDateTime(new Date(sceneTimeMs()));
         dom['dist-earth'].textContent = formatDistance(distEarth);
         dom['dist-moon'].textContent = formatDistance(distMoon);
         dom['velocity'].textContent = formatVelocity(velocity);
@@ -5783,8 +6498,8 @@ LIMIT 1`;
 
     function formatZoomReadout(distance) {
         const km = distance * 1000;
-        if (km >= 1e6) return `${(km / 1e6).toFixed(2).replace('.', ',')} Mio km`;
-        if (km >= 1000) return `${Math.round(km).toLocaleString('de-DE')} km`;
+        if (km >= 1e6) return t('zoom.millionKm', { value: formatNumber(km / 1e6, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (km >= 1000) return `${formatNumber(Math.round(km))} km`;
         return `${Math.round(km)} km`;
     }
 
@@ -5944,7 +6659,7 @@ LIMIT 1`;
         if (dom['real-time-zone']) {
             dom['real-time-zone'].textContent = getLocalTimeZoneLabel(localNow);
         }
-        dom['real-time-berlin'].textContent = localTimeOnly.format(localNow);
+        dom['real-time-berlin'].textContent = formatLocalTimeOnly(localNow);
 
         state.dynamicLabels.forEach((label) => {
             const distance = state.camera.position.distanceTo(label.position);
