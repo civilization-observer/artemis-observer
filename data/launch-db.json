@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-25T21:51:31Z",
+  "generatedAt": "2026-04-25T22:39:08Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -597,21 +597,21 @@
       "mission": "Progress MS-34 (95P)",
       "missionDescription": "Progress resupply mission to the International Space Station.",
       "orbit": "Low Earth Orbit",
-      "status": "go",
-      "outcome": "",
-      "statusName": "Go for Launch",
-      "statusAbbrev": "Go",
-      "statusDescription": "Current T-0 confirmed by official or reliable sources.",
+      "status": "success",
+      "outcome": "success",
+      "statusName": "Launch Successful",
+      "statusAbbrev": "Success",
+      "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/program/17/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/33eb7522-d371-4195-addb-c22aeff30c41/",
-      "updatedAt": "2026-04-25T21:51:31Z",
+      "updatedAt": "2026-04-25T22:39:08Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-25T22:21:00Z"
       ],
-      "preflightCheckedAt": null,
+      "preflightCheckedAt": "2026-04-25T22:39:08Z",
       "postflightCheckedAt": null,
-      "preflightStatus": "",
+      "preflightStatus": "success",
       "postflightStatus": "",
       "livestreamUrl": "https://www.youtube.com/watch?v=7FJUz-54AX0"
     },
