@@ -1,6 +1,6 @@
 {
   "lastFeedRefreshAt": "2026-04-25T23:22:07Z",
-  "lastCheckRunAt": "2026-04-25T23:22:07Z",
+  "lastCheckRunAt": "2026-04-26T00:03:20Z",
   "lastSatelliteRefreshAt": "2026-04-25T21:51:31Z",
   "pendingChecks": [
     {
@@ -280,6 +280,8 @@
       "overdue": false
     }
   ],
-  "lastErrors": [],
-  "lastIssOemRefreshAt": "2026-04-25T21:51:31Z"
+  "lastErrors": [
+    "satellite refresh failed: HTTP Error 503: Service Unavailable"
+  ],
+  "lastIssOemRefreshAt": "2026-04-26T00:03:20Z"
 }
