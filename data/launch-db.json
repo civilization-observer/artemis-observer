@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-26T10:04:19Z",
+  "generatedAt": "2026-04-26T11:00:48Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -611,14 +611,14 @@
       "statusDescription": "Awaiting official confirmation - current date is known with some certainty.",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/launch/74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4/",
-      "updatedAt": "2026-04-26T10:04:19Z",
+      "updatedAt": "2026-04-26T11:00:48Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-30T00:00:00Z"
       ],
-      "preflightCheckedAt": null,
+      "preflightCheckedAt": "2026-04-26T11:00:48Z",
       "postflightCheckedAt": null,
-      "preflightStatus": "",
+      "preflightStatus": "delayed",
       "postflightStatus": ""
     },
     {
