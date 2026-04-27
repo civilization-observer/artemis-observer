@@ -1,6 +1,6 @@
 {
   "lastFeedRefreshAt": "2026-04-27T20:15:43Z",
-  "lastCheckRunAt": "2026-04-27T20:15:43Z",
+  "lastCheckRunAt": "2026-04-27T21:30:31Z",
   "lastSatelliteRefreshAt": "2026-04-27T20:15:43Z",
   "pendingChecks": [
     {
@@ -280,6 +280,8 @@
       "overdue": false
     }
   ],
-  "lastErrors": [],
+  "lastErrors": [
+    "feed refresh failed: The read operation timed out"
+  ],
   "lastIssOemRefreshAt": "2026-04-27T20:15:43Z"
 }
