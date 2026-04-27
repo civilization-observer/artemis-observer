@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-27T12:13:39Z",
+  "generatedAt": "2026-04-27T14:30:04Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -594,22 +594,22 @@
       "mission": "ViaSat-3 F3 (ViaSat-3 Asia-Pacific)",
       "missionDescription": "The ViaSat-3 is a series of three Ka-band satellites is expected to provide vastly superior capabilities in terms of service speed and flexibility for a satellite platform. Each ViaSat-3 class satellite is expected to deliver more than 1-Terabit per second of network capacity, and to leverage high levels of flexibility to dynamically direct capacity to where customers are located.",
       "orbit": "Geostationary Transfer Orbit",
-      "status": "go",
-      "outcome": "",
-      "statusName": "Go for Launch",
-      "statusAbbrev": "Go",
-      "statusDescription": "Current T-0 confirmed by official or reliable sources.",
+      "status": "delayed",
+      "outcome": "delayed",
+      "statusName": "On Hold",
+      "statusAbbrev": "Hold",
+      "statusDescription": "The countdown has been paused, but the launch can still happen within the launch window.",
       "sourceUrl": "https://www.spacex.com/launches/viasat3f3",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/4cc237b2-c61a-491e-9532-466cce81f524/",
-      "updatedAt": "2026-04-27T12:13:39Z",
+      "updatedAt": "2026-04-27T14:30:04Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "livestreamUrl": "https://www.youtube.com/watch?v=A82GGwyTYNg",
       "previousNets": [
         "2026-04-30T00:00:00Z"
       ],
-      "preflightCheckedAt": null,
+      "preflightCheckedAt": "2026-04-27T14:30:04Z",
       "postflightCheckedAt": null,
-      "preflightStatus": "",
+      "preflightStatus": "delayed",
       "postflightStatus": ""
     },
     {
