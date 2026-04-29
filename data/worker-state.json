@@ -1,14 +1,8 @@
 {
-  "lastFeedRefreshAt": "2026-04-29T14:38:21Z",
-  "lastCheckRunAt": "2026-04-29T14:38:21Z",
+  "lastFeedRefreshAt": "2026-04-29T16:18:49Z",
+  "lastCheckRunAt": "2026-04-29T16:18:49Z",
   "lastSatelliteRefreshAt": "2026-04-29T14:38:21Z",
   "pendingChecks": [
-    {
-      "id": "4cc237b2-c61a-491e-9532-466cce81f524",
-      "phase": "postflight",
-      "dueAt": "2026-04-29T14:43:00Z",
-      "overdue": false
-    },
     {
       "id": "6bfe08b4-a35d-4297-8de7-dec0eb678eb6",
       "phase": "preflight",
