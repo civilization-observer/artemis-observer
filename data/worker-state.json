@@ -1,14 +1,8 @@
 {
-  "lastFeedRefreshAt": "2026-04-29T08:59:31Z",
-  "lastCheckRunAt": "2026-04-29T08:59:31Z",
-  "lastSatelliteRefreshAt": "2026-04-29T08:59:31Z",
+  "lastFeedRefreshAt": "2026-04-29T11:02:04Z",
+  "lastCheckRunAt": "2026-04-29T11:02:04Z",
+  "lastSatelliteRefreshAt": "2026-04-29T11:02:04Z",
   "pendingChecks": [
-    {
-      "id": "74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4",
-      "phase": "preflight",
-      "dueAt": "2026-04-29T10:45:00Z",
-      "overdue": false
-    },
     {
       "id": "74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4",
       "phase": "postflight",
@@ -293,5 +287,5 @@
     }
   ],
   "lastErrors": [],
-  "lastIssOemRefreshAt": "2026-04-29T08:59:31Z"
+  "lastIssOemRefreshAt": "2026-04-29T11:02:04Z"
 }
