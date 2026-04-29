@@ -1,8 +1,20 @@
 {
-  "lastFeedRefreshAt": "2026-04-28T23:12:59Z",
-  "lastCheckRunAt": "2026-04-29T00:10:26Z",
-  "lastSatelliteRefreshAt": "2026-04-28T22:10:51Z",
+  "lastFeedRefreshAt": "2026-04-29T04:05:29Z",
+  "lastCheckRunAt": "2026-04-29T04:05:29Z",
+  "lastSatelliteRefreshAt": "2026-04-29T04:05:29Z",
   "pendingChecks": [
+    {
+      "id": "74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4",
+      "phase": "preflight",
+      "dueAt": "2026-04-29T10:45:00Z",
+      "overdue": false
+    },
+    {
+      "id": "74b3aa8f-dc54-43dd-b8dd-1dc62ccccfc4",
+      "phase": "postflight",
+      "dueAt": "2026-04-29T11:30:00Z",
+      "overdue": false
+    },
     {
       "id": "4cc237b2-c61a-491e-9532-466cce81f524",
       "phase": "preflight",
@@ -13,18 +25,6 @@
       "id": "4cc237b2-c61a-491e-9532-466cce81f524",
       "phase": "postflight",
       "dueAt": "2026-04-29T14:43:00Z",
-      "overdue": false
-    },
-    {
-      "id": "aafe107e-46d8-420c-bcb9-192069d80893",
-      "phase": "preflight",
-      "dueAt": "2026-04-29T23:45:00Z",
-      "overdue": false
-    },
-    {
-      "id": "aafe107e-46d8-420c-bcb9-192069d80893",
-      "phase": "postflight",
-      "dueAt": "2026-04-30T00:30:00Z",
       "overdue": false
     },
     {
@@ -172,6 +172,12 @@
       "overdue": false
     },
     {
+      "id": "aafe107e-46d8-420c-bcb9-192069d80893",
+      "phase": "preflight",
+      "dueAt": "2026-05-30T23:45:00Z",
+      "overdue": false
+    },
+    {
       "id": "ed83366c-872c-4484-97c1-bc74832304fc",
       "phase": "preflight",
       "dueAt": "2026-05-30T23:45:00Z",
@@ -232,6 +238,12 @@
       "overdue": false
     },
     {
+      "id": "aafe107e-46d8-420c-bcb9-192069d80893",
+      "phase": "postflight",
+      "dueAt": "2026-05-31T00:30:00Z",
+      "overdue": false
+    },
+    {
       "id": "ed83366c-872c-4484-97c1-bc74832304fc",
       "phase": "postflight",
       "dueAt": "2026-05-31T00:30:00Z",
@@ -281,5 +293,5 @@
     }
   ],
   "lastErrors": [],
-  "lastIssOemRefreshAt": "2026-04-28T22:10:51Z"
+  "lastIssOemRefreshAt": "2026-04-29T04:05:29Z"
 }
