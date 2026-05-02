@@ -410,9 +410,6 @@ def due_phase(launch: dict, now: datetime) -> str | None:
 
     status = text_value(launch.get("status"))
     outcome = text_value(launch.get("outcome"))
-    if status in TERMINAL_OUTCOMES or outcome in TERMINAL_OUTCOMES:
-        return None
-
     post_checked = parse_time(launch.get("postflightCheckedAt"))
     pre_checked = parse_time(launch.get("preflightCheckedAt"))
     last_post_age = now - post_checked if post_checked else None
@@ -424,6 +421,9 @@ def due_phase(launch: dict, now: datetime) -> str | None:
         )
         if needs_first_post or needs_recheck:
             return "postflight"
+
+    if status in TERMINAL_OUTCOMES or outcome in TERMINAL_OUTCOMES:
+        return None
 
     if pre_checked is None and now >= net - PREFLIGHT_WINDOW:
         if now <= net + PREFLIGHT_MISSED_MARK_AFTER:
@@ -439,7 +439,11 @@ def pending_checks(launches: list[dict], now: datetime) -> list[dict]:
         net = parse_time(launch.get("net"))
         if net is None:
             continue
-        if not launch.get("preflightCheckedAt") and launch.get("outcome") not in TERMINAL_OUTCOMES:
+        outcome = text_value(launch.get("outcome"))
+        status = text_value(launch.get("status"))
+        is_terminal = outcome in TERMINAL_OUTCOMES or status in TERMINAL_OUTCOMES
+
+        if not launch.get("preflightCheckedAt") and not is_terminal:
             pending.append(
                 {
                     "id": launch.get("id"),
@@ -448,7 +452,7 @@ def pending_checks(launches: list[dict], now: datetime) -> list[dict]:
                     "overdue": now >= net - PREFLIGHT_WINDOW,
                 }
             )
-        if not launch.get("postflightCheckedAt") and launch.get("outcome") not in TERMINAL_OUTCOMES:
+        if not launch.get("postflightCheckedAt"):
             pending.append(
                 {
                     "id": launch.get("id"),
