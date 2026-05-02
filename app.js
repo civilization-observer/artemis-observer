@@ -68,6 +68,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const SATELLITE_LAYER_OPACITY = 0.88;
     const SATELLITE_LAYER_DIMMED_OPACITY = 0.22;
     const SATELLITE_PICK_THRESHOLD = 0.18;
+    const SATELLITE_POINT_BASE_SIZE = 0.11;
+    const SATELLITE_POINT_REDUCED_MIN_SIZE = 0.012;
+    const SATELLITE_POINT_REALISTIC_MIN_SIZE = 0.000012;
+    const SATELLITE_POINT_REALISTIC_FAR_DISTANCE = 180;
+    const SATELLITE_SIZE_MODES = ['default', 'reduced', 'realistic'];
     const LAUNCH_FOCUS_VIEW_DISTANCE = 10.5;
     const LAUNCH_ASCENT_SAMPLE_COUNT = 144;
     const LAUNCH_ORBIT_PREVIEW_SAMPLE_COUNT = 220;
@@ -192,6 +197,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'sat.follow': 'Follow',
             'sat.following': 'Tracking on',
             'sat.height': 'Altitude',
+            'sat.sizeMode.default': 'Normal',
+            'sat.sizeMode.reduced': 'Smaller',
+            'sat.sizeMode.realistic': 'Realistic',
             'sat.noActiveFollow': 'No tracking active',
             'sat.cacheFallback': 'Satellites from local cache | Live source currently unreachable ({error}).',
             'sat.catalogLoadFailed': 'Satellite catalog could not be loaded ({error}).',
@@ -354,6 +362,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'sat.follow': 'Folgen',
             'sat.following': 'Verfolgung an',
             'sat.height': 'Hoehe',
+            'sat.sizeMode.default': 'Normal',
+            'sat.sizeMode.reduced': 'Kleiner',
+            'sat.sizeMode.realistic': 'Realistisch',
             'sat.noActiveFollow': 'Keine Verfolgung aktiv',
             'sat.cacheFallback': 'Satelliten aus lokalem Cache | Live-Quelle aktuell nicht erreichbar ({error}).',
             'sat.catalogLoadFailed': 'Satellitenkatalog konnte nicht geladen werden ({error}).',
@@ -428,6 +439,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'Satelliten-Tracking': 'Satellite tracking',
             'Lege fest, wie weit die vorausberechnete Flugbahn fuer den verfolgten Satelliten angezeigt wird.': 'Choose how far the predicted path for the tracked satellite is shown.',
             'Flugbahn-Laenge': 'Path length',
+            'Punktgroesse': 'Point size',
+            'Normal': 'Normal',
+            'Kleiner': 'Smaller',
+            'Realistisch': 'Realistic',
             'Launch-Groundtrack': 'Launch ground track',
             'Lege fest, wie weit die blaue Bodenprojektion einer ausgewaehlten Mission vorauslaeuft.': 'Choose how far the blue ground projection for a selected mission runs ahead.',
             'Bodenroute-Laenge': 'Ground route length',
@@ -923,6 +938,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         );
     }
 
+    function normalizeSatelliteSizeMode(value, legacyRealistic = false) {
+        const mode = String(value || '');
+        if (SATELLITE_SIZE_MODES.includes(mode)) return mode;
+        return legacyRealistic ? 'realistic' : 'reduced';
+    }
+
     function readUiState() {
         const defaults = {
             news: true,
@@ -930,6 +951,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             controls: true,
             orbitRevolutions: SATELLITE_ORBIT_DEFAULT_REVOLUTIONS,
             launchGroundTrackRevolutions: LAUNCH_GROUND_TRACK_DEFAULT_REVOLUTIONS,
+            satelliteSizeMode: 'reduced',
             language: defaultUiLanguage()
         };
         try {
@@ -938,6 +960,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             const parsed = { ...defaults, ...JSON.parse(raw) };
             parsed.orbitRevolutions = clampSatelliteOrbitRevolutions(parsed.orbitRevolutions);
             parsed.launchGroundTrackRevolutions = clampLaunchGroundTrackRevolutions(parsed.launchGroundTrackRevolutions);
+            parsed.satelliteSizeMode = normalizeSatelliteSizeMode(
+                parsed.satelliteSizeMode,
+                Boolean(parsed.satelliteRealisticSize)
+            );
+            delete parsed.satelliteRealisticSize;
             parsed.language = normalizeLanguage(parsed.language);
             return parsed;
         } catch (error) {
@@ -1154,6 +1181,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
             'mobile-nav-satellite',
             'satellite-orbit-revolutions',
             'satellite-orbit-revolutions-readout',
+            'satellite-size-mode-readout',
+            'satellite-size-mode-default',
+            'satellite-size-mode-reduced',
+            'satellite-size-mode-realistic',
             'launch-ground-track-revolutions',
             'launch-ground-track-revolutions-readout',
             'language-select',
@@ -1292,6 +1323,34 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         updateSatelliteOrbitPath(true);
     }
 
+    function syncSatelliteSizeSettingsUi() {
+        const mode = normalizeSatelliteSizeMode(state.panelVisibility.satelliteSizeMode);
+        state.panelVisibility.satelliteSizeMode = mode;
+        if (dom['satellite-size-mode-readout']) {
+            dom['satellite-size-mode-readout'].textContent = t(`sat.sizeMode.${mode}`);
+        }
+        SATELLITE_SIZE_MODES.forEach((option) => {
+            const button = dom[`satellite-size-mode-${option}`];
+            if (!button) return;
+            const active = option === mode;
+            button.setAttribute('aria-pressed', String(active));
+            button.classList.toggle('active', active);
+        });
+    }
+
+    function setSatelliteSizeMode(mode) {
+        const next = normalizeSatelliteSizeMode(mode);
+        if (state.panelVisibility.satelliteSizeMode === next) return;
+        state.panelVisibility.satelliteSizeMode = next;
+        syncSatelliteSizeSettingsUi();
+        writeUiState();
+        const distance = state.camera && state.controls
+            ? state.camera.position.distanceTo(state.controls.target)
+            : SATELLITE_POINT_REALISTIC_FAR_DISTANCE;
+        updateSatellitePointSizing(distance);
+        updateSatelliteHighlight();
+    }
+
     function syncLaunchGroundTrackSettingsUi() {
         const value = clampLaunchGroundTrackRevolutions(state.panelVisibility.launchGroundTrackRevolutions);
         state.panelVisibility.launchGroundTrackRevolutions = value;
@@ -1378,6 +1437,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         applyStaticTranslations();
         syncLanguageSettingsUi();
         syncSatelliteOrbitSettingsUi();
+        syncSatelliteSizeSettingsUi();
         syncLaunchGroundTrackSettingsUi();
         const artemisOpen = dom['toggle-artemis-settings']?.getAttribute('aria-expanded') === 'true';
         setArtemisSettingsOpen(artemisOpen);
@@ -1722,6 +1782,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         dom['satellite-orbit-revolutions']?.addEventListener('input', onSatelliteOrbitRevolutionsInput);
         dom['launch-ground-track-revolutions']?.addEventListener('input', onLaunchGroundTrackRevolutionsInput);
+        document.querySelectorAll('[data-satellite-size-mode]').forEach((button) => {
+            button.addEventListener('click', () => setSatelliteSizeMode(button.getAttribute('data-satellite-size-mode')));
+        });
         document.querySelectorAll('[data-language-option]').forEach((button) => {
             button.addEventListener('click', () => setLanguage(button.getAttribute('data-language-option')));
         });
@@ -1771,6 +1834,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         syncLanguageSettingsUi();
         applyPanelVisibility();
         syncSatelliteOrbitSettingsUi();
+        syncSatelliteSizeSettingsUi();
         syncLaunchGroundTrackSettingsUi();
         initScene();
         bindUi();
@@ -2275,7 +2339,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         state.satellitePoints = new THREE.Points(
             new THREE.BufferGeometry(),
             new THREE.PointsMaterial({
-                size: 0.11,
+                size: SATELLITE_POINT_BASE_SIZE,
                 sizeAttenuation: true,
                 vertexColors: true,
                 transparent: true,
@@ -2346,6 +2410,33 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         group.add(group.userData.modelRoot);
         group.frustumCulled = false;
         return group;
+    }
+
+    function satellitePointSizeForDistance(distance) {
+        const mode = normalizeSatelliteSizeMode(state.panelVisibility.satelliteSizeMode);
+        if (mode === 'default') return SATELLITE_POINT_BASE_SIZE;
+        if (mode === 'realistic') return SATELLITE_POINT_REALISTIC_MIN_SIZE;
+        if (!Number.isFinite(distance)) return SATELLITE_POINT_BASE_SIZE;
+
+        // Scene units are 1000 km. Reduced mode keeps a visible proxy while zooming in.
+        const clampedDistance = THREE.MathUtils.clamp(distance, ZOOM_DIST_MIN, SATELLITE_POINT_REALISTIC_FAR_DISTANCE);
+        const t = THREE.MathUtils.clamp(
+            (Math.log(clampedDistance) - Math.log(ZOOM_DIST_MIN)) /
+            (Math.log(SATELLITE_POINT_REALISTIC_FAR_DISTANCE) - Math.log(ZOOM_DIST_MIN)),
+            0,
+            1
+        );
+        const eased = t * t * (3 - 2 * t);
+        const visibilityBias = Math.pow(eased, 1.05);
+        return THREE.MathUtils.lerp(SATELLITE_POINT_REDUCED_MIN_SIZE, SATELLITE_POINT_BASE_SIZE, visibilityBias);
+    }
+
+    function updateSatellitePointSizing(cameraTargetDistance) {
+        if (!state.satellitePoints?.material) return;
+        const size = satellitePointSizeForDistance(cameraTargetDistance);
+        if (Math.abs(state.satellitePoints.material.size - size) < 1e-8) return;
+        state.satellitePoints.material.size = size;
+        state.satellitePoints.material.needsUpdate = true;
     }
 
     function createSatelliteFocusRingTexture() {
@@ -2546,7 +2637,21 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         const side = new THREE.Vector3().crossVectors(radial, alongTrack).normalize();
         const correctedTrack = new THREE.Vector3().crossVectors(side, radial).normalize();
         const basis = new THREE.Matrix4().makeBasis(side, radial, correctedTrack.clone().multiplyScalar(-1));
-        state.satelliteHighlight.quaternion.setFromRotationMatrix(basis);
+        // Keep the ring parent unrotated so the focus sprite stays circular on screen.
+        state.satelliteHighlight.quaternion.identity();
+
+        const modelRoot = state.satelliteHighlight.userData.modelRoot;
+        if (modelRoot) {
+            modelRoot.quaternion.setFromRotationMatrix(basis);
+        }
+
+        const focusLight = state.satelliteHighlight.userData.focusLight;
+        if (focusLight) {
+            focusLight.position
+                .copy(radial)
+                .multiplyScalar(0.65)
+                .addScaledVector(correctedTrack, -0.55);
+        }
     }
 
     function createMoon() {
@@ -5473,6 +5578,22 @@ LIMIT 1`;
         state.satelliteHighlight.scale.setScalar(scale);
         orientSatelliteHighlight(localPosition);
 
+        const modelRoot = state.satelliteHighlight.userData.modelRoot;
+        if (modelRoot) {
+            const mode = normalizeSatelliteSizeMode(state.panelVisibility.satelliteSizeMode);
+            let modelScale = mode !== 'default'
+                ? THREE.MathUtils.clamp(
+                    satellitePointSizeForDistance(cameraDistance) / SATELLITE_POINT_BASE_SIZE,
+                    0.00008,
+                    1
+                )
+                : 1;
+            if (mode === 'reduced') {
+                modelScale *= 1.2;
+            }
+            modelRoot.scale.setScalar(modelScale);
+        }
+
         const focusRing = state.satelliteHighlight.userData.focusRing;
         if (focusRing) {
             focusRing.scale.setScalar(focusRing.userData.baseScale || 1.65);
@@ -6640,6 +6761,7 @@ LIMIT 1`;
         }
 
         const camTargetDist = state.camera.position.distanceTo(state.controls.target);
+        updateSatellitePointSizing(camTargetDist);
         const showAllOrbits = camTargetDist >= ORBITS_ALL_DISTANCE;
         state.planetOrbitList.forEach((line) => { line.visible = showAllOrbits; });
         if (state.planetOrbits[2]) state.planetOrbits[2].visible = true;

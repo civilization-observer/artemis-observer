@@ -369,6 +369,17 @@
                 </div>
                 <input type="range" id="satellite-orbit-revolutions" min="1" max="5" value="2" step="1">
             </div>
+            <div class="size-mode-setting-wrap">
+                <div class="mission-slider-head">
+                    <span class="small-label">Punktgroesse</span>
+                    <span id="satellite-size-mode-readout">Kleiner</span>
+                </div>
+                <div class="size-mode-toggle-row" role="group" aria-label="Punktgroesse">
+                    <button type="button" class="toggle-chip" id="satellite-size-mode-default" data-satellite-size-mode="default" aria-pressed="false">Normal</button>
+                    <button type="button" class="toggle-chip" id="satellite-size-mode-reduced" data-satellite-size-mode="reduced" aria-pressed="true">Kleiner</button>
+                    <button type="button" class="toggle-chip" id="satellite-size-mode-realistic" data-satellite-size-mode="realistic" aria-pressed="false">Realistisch</button>
+                </div>
+            </div>
         </section>
 
         <section class="drawer-section">
