@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-02T09:35:37Z",
+  "generatedAt": "2026-05-02T09:59:05Z",
   "source": "launch-worker:observed-db",
   "launches": [
     {
@@ -647,17 +647,17 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "livestreamUrl": "https://www.youtube.com/watch?v=IcZeELuvo3g",
       "sourceUrl": "https://www.spacex.com/launches/sl-10-38",
-      "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/b3877a27-7332-47cb-ac46-12a32143081b/",
-      "updatedAt": "2026-05-02T09:35:37Z",
+      "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/b3877a27-7332-47cb-ac46-12a32143081b/?format=json",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-20T02:52:42Z",
       "previousNets": [
         "2026-05-01T17:33:00Z",
         "2026-05-01T17:35:20Z"
       ],
       "preflightCheckedAt": "2026-05-01T18:16:15Z",
-      "postflightCheckedAt": null,
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
       "preflightStatus": "go",
-      "postflightStatus": "",
+      "postflightStatus": "success",
       "outcome": "success"
     },
     {
@@ -747,17 +747,17 @@
       "livestreamUrl": "https://www.youtube.com/watch?v=vxCs82EfrlE",
       "sourceUrl": "https://www.spacex.com/launches/sl-17-36",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/6bfe08b4-a35d-4297-8de7-dec0eb678eb6/",
-      "updatedAt": "2026-04-30T23:08:43Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-29T02:00:00Z",
         "2026-04-30T02:00:00Z",
         "2026-04-30T02:37:53Z"
       ],
-      "preflightCheckedAt": null,
-      "postflightCheckedAt": null,
-      "preflightStatus": "",
-      "postflightStatus": "",
+      "preflightCheckedAt": "2026-05-02T09:59:05Z",
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
+      "preflightStatus": "missed",
+      "postflightStatus": "success",
       "outcome": "success"
     },
     {
@@ -813,16 +813,16 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://www.ulalaunch.com/missions/next-launch/atlas-v-amazon-leo-6",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/7e89e423-6f47-40a0-b075-c6fc1d9cf228/",
-      "updatedAt": "2026-04-28T23:12:59Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-27T00:00:00Z",
         "2026-04-28T00:52:00Z"
       ],
       "preflightCheckedAt": "2026-04-28T01:20:12Z",
-      "postflightCheckedAt": null,
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
       "preflightStatus": "go",
-      "postflightStatus": "",
+      "postflightStatus": "success",
       "livestreamUrl": "https://www.youtube.com/watch?v=FYTMd1XYguo"
     },
     {
@@ -879,15 +879,15 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/program/17/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/33eb7522-d371-4195-addb-c22aeff30c41/",
-      "updatedAt": "2026-04-26T22:20:38Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-25T22:21:00Z"
       ],
       "preflightCheckedAt": "2026-04-25T22:39:08Z",
-      "postflightCheckedAt": null,
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
       "preflightStatus": "success",
-      "postflightStatus": "",
+      "postflightStatus": "success",
       "livestreamUrl": "https://www.youtube.com/watch?v=7FJUz-54AX0"
     },
     {
@@ -909,11 +909,13 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/launch/88ab98d8-44e9-4aae-ac0f-02006a1d7ce6/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/88ab98d8-44e9-4aae-ac0f-02006a1d7ce6/",
-      "updatedAt": "2026-04-26T11:52:54Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-22T03:38:28Z",
       "preflightCheckedAt": "2026-04-25T12:30:46Z",
       "preflightStatus": "go",
-      "outcome": "success"
+      "outcome": "success",
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
+      "postflightStatus": "success"
     },
     {
       "id": "214b4db1-7112-4428-a999-29d2765c8306",
@@ -934,12 +936,16 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/launch/214b4db1-7112-4428-a999-29d2765c8306/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/214b4db1-7112-4428-a999-29d2765c8306/",
-      "updatedAt": "2026-04-25T05:01:27Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-20T21:30:27Z",
       "outcome": "success",
       "previousNets": [
         "2026-04-24T06:30:00Z"
-      ]
+      ],
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
+      "postflightStatus": "success",
+      "preflightCheckedAt": "2026-05-02T09:59:05Z",
+      "preflightStatus": "missed"
     },
     {
       "id": "41139aa5-3f45-440a-8131-9cb391ddc995",
@@ -961,11 +967,15 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://ll.thespacedevs.com/2.2.0/launch/41139aa5-3f45-440a-8131-9cb391ddc995/",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/41139aa5-3f45-440a-8131-9cb391ddc995/",
-      "updatedAt": "2026-04-24T08:18:17Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "previousNets": [
         "2026-04-30T00:00:00Z"
-      ]
+      ],
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
+      "postflightStatus": "success",
+      "preflightCheckedAt": "2026-05-02T09:59:05Z",
+      "preflightStatus": "missed"
     },
     {
       "id": "20418dc6-1870-4018-adda-1e6156717f02",
@@ -1020,10 +1030,14 @@
       "statusDescription": "The launch vehicle successfully inserted its payload(s) into the target orbit(s).",
       "sourceUrl": "https://www.youtube.com/watch?v=R933NMzP1T0",
       "apiUrl": "https://ll.thespacedevs.com/2.2.0/launch/9281afa8-140d-425b-a560-2fa59feef814/",
-      "updatedAt": "2026-04-23T23:59:58Z",
+      "updatedAt": "2026-05-02T09:59:05Z",
       "firstSeenAt": "2026-04-19T13:07:28Z",
       "livestreamUrl": "https://www.youtube.com/watch?v=R933NMzP1T0",
-      "outcome": "success"
+      "outcome": "success",
+      "postflightCheckedAt": "2026-05-02T09:59:05Z",
+      "postflightStatus": "success",
+      "preflightCheckedAt": "2026-05-02T09:59:05Z",
+      "preflightStatus": "missed"
     },
     {
       "id": "4e074623-426a-4ab2-8729-a85200684bef",
