@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "starlink",
+      "pattern": "^STARLINK\\b(?!.*(?:V2|V2 MINI))",
+      "type": "Kommunikationssatellit",
+      "operator": "SpaceX",
+      "country": "USA",
+      "sizeLabel": "ca. 2,8 x 1,4 m",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Starlink",
+      "confidence": "constellation"
+    },
+    {
+      "id": "starlink-v2",
+      "pattern": "^STARLINK\\b.*(?:V2|V2 MINI)",
+      "type": "Kommunikationssatellit",
+      "operator": "SpaceX",
+      "country": "USA",
+      "sizeLabel": "ca. 4,1 x 2,7 m",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Starlink V2",
+      "confidence": "constellation"
+    },
+    {
+      "id": "qianfan",
+      "pattern": "^QIANFAN\\b",
+      "type": "Kommunikationssatellit (Qianfan/Spacesail)",
+      "operator": "Shanghai Spacecom Satellite Technology (SSST)",
+      "country": "China",
+      "sizeLabel": "nicht veroeffentlicht",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Qianfan/Spacesail",
+      "confidence": "constellation"
+    },
+    {
+      "id": "oneweb",
+      "pattern": "^ONEWEB\\b",
+      "type": "Kommunikationssatellit",
+      "operator": "Eutelsat OneWeb",
+      "country": "Vereinigtes Koenigreich/Frankreich",
+      "sizeLabel": "ca. 1,0 x 1,0 x 1,3 m",
+      "source": "CelesTrak SATCAT + Konstellationsregel: OneWeb",
+      "confidence": "constellation"
+    },
+    {
+      "id": "kuiper",
+      "pattern": "^(KUIPER\\b|.*PROJECT KUIPER)",
+      "type": "Kommunikationssatellit",
+      "operator": "Amazon Project Kuiper",
+      "country": "USA",
+      "sizeLabel": "nicht veroeffentlicht",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Project Kuiper",
+      "confidence": "constellation"
+    },
+    {
+      "id": "bb-sda",
+      "pattern": "^BB[34]\\b",
+      "type": "Militaerischer Kommunikations-/Datenrelaissatellit",
+      "operator": "Space Development Agency (SDA)",
+      "country": "USA",
+      "sizeLabel": "nicht veroeffentlicht",
+      "source": "CelesTrak SATCAT + Missionsregel: SDA Tranche/Tracking Layer",
+      "confidence": "mission-rule"
+    },
+    {
+      "id": "globalstar",
+      "pattern": "^GLOBALSTAR\\b",
+      "type": "Kommunikationssatellit",
+      "operator": "Globalstar",
+      "country": "USA",
+      "sizeLabel": "ca. 2,4 x 2,4 x 1,3 m",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Globalstar",
+      "confidence": "constellation"
+    },
+    {
+      "id": "iridium",
+      "pattern": "^IRIDIUM\\b",
+      "type": "Kommunikationssatellit",
+      "operator": "Iridium Communications",
+      "country": "USA",
+      "sizeLabel": "ca. 3,1 x 2,4 x 1,5 m",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Iridium",
+      "confidence": "constellation"
+    },
+    {
+      "id": "planet",
+      "pattern": "^(FLOCK|DOVE|SKYSAT)\\b",
+      "type": "Erdbeobachtung",
+      "operator": "Planet Labs",
+      "country": "USA",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Planet",
+      "confidence": "constellation"
+    },
+    {
+      "id": "spire-lemur",
+      "pattern": "^LEMUR\\b",
+      "type": "Wetter-/AIS-Datensatellit",
+      "operator": "Spire Global",
+      "country": "USA/Luxemburg",
+      "sizeLabel": "ca. 3U/6U CubeSat",
+      "source": "CelesTrak SATCAT + Konstellationsregel: Spire Lemur",
+      "confidence": "constellation"
+    },
+    {
+      "id": "gps-navstar",
+      "pattern": "^(GPS|NAVSTAR)\\b",
+      "type": "Navigationssatellit",
+      "operator": "U.S. Space Force",
+      "country": "USA",
+      "sizeLabel": "mehrere Meter",
+      "source": "CelesTrak SATCAT + Systemregel: GPS/Navstar",
+      "confidence": "system"
+    },
+    {
+      "id": "galileo",
+      "pattern": "^(GALILEO|GSAT01|GSAT02)\\b",
+      "type": "Navigationssatellit",
+      "operator": "EU/ESA/EUSPA",
+      "country": "Europaeische Union",
+      "sizeLabel": "ca. 2,7 x 1,2 x 1,1 m",
+      "source": "CelesTrak SATCAT + Systemregel: Galileo",
+      "confidence": "system"
+    },
+    {
+      "id": "glonass",
+      "pattern": "^GLONASS\\b",
+      "type": "Navigationssatellit",
+      "operator": "Roskosmos",
+      "country": "Russland",
+      "source": "CelesTrak SATCAT + Systemregel: GLONASS",
+      "confidence": "system"
+    },
+    {
+      "id": "beidou",
+      "pattern": "^(BEIDOU|COMPASS)\\b",
+      "type": "Navigationssatellit",
+      "operator": "BeiDou/CNSA",
+      "country": "China",
+      "source": "CelesTrak SATCAT + Systemregel: BeiDou",
+      "confidence": "system"
+    },
+    {
+      "id": "sentinel",
+      "pattern": "^SENTINEL\\b",
+      "type": "Erdbeobachtung",
+      "operator": "ESA/Copernicus",
+      "country": "Europaeische Union",
+      "source": "CelesTrak SATCAT + Programmregel: Sentinel/Copernicus",
+      "confidence": "program"
+    },
+    {
+      "id": "landsat",
+      "pattern": "^LANDSAT\\b",
+      "type": "Erdbeobachtung",
+      "operator": "NASA/USGS",
+      "country": "USA",
+      "source": "CelesTrak SATCAT + Programmregel: Landsat",
+      "confidence": "program"
+    }
+  ]
+}

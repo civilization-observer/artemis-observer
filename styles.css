@@ -537,6 +537,29 @@ button.stat-card:focus-visible {
     background: rgba(8, 18, 37, 0.72);
 }
 
+.pad-row {
+    width: 100%;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pad-row:hover,
+.pad-row:focus-visible {
+    border-color: rgba(95, 216, 255, 0.42);
+    background: rgba(17, 36, 66, 0.9);
+}
+
+.pad-row-meta {
+    grid-column: 1 / -1;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
 .stat-ranking-name {
     min-width: 0;
     overflow: hidden;
@@ -1106,6 +1129,30 @@ button.stat-card:focus-visible {
     border-color: rgba(95, 216, 255, 0.48);
 }
 
+.sat-group-filter {
+    margin-top: 14px;
+}
+
+.sat-group-filter label {
+    display: block;
+    margin-bottom: 7px;
+}
+
+#satellite-group-filter {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(95, 216, 255, 0.18);
+    background: rgba(9, 18, 37, 0.92);
+    color: #ffffff;
+    font: inherit;
+    outline: none;
+}
+
+#satellite-group-filter:focus {
+    border-color: rgba(95, 216, 255, 0.48);
+}
+
 #satellite-search-status {
     margin: 14px 0 0;
     color: var(--muted);
@@ -1193,6 +1240,40 @@ button.stat-card:focus-visible {
     margin-top: 12px;
 }
 
+.sat-constellation-panel.is-hidden {
+    display: none;
+}
+
+.window-slider-wrap {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(95, 216, 255, 0.14);
+    background: rgba(9, 18, 37, 0.82);
+}
+
+.window-slider-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.window-slider-head strong {
+    color: var(--cyan);
+    font-size: 12px;
+    font-family: "Consolas", "Courier New", monospace;
+}
+
+.window-slider-wrap input[type="range"] {
+    width: 100%;
+}
+
+body.satellite-group-active:not(.satellite-following-object) #sat-focus-details-grid {
+    display: none;
+}
+
 .search-empty {
     color: var(--muted);
     font-size: 13px;
@@ -1243,21 +1324,10 @@ button.stat-card:focus-visible {
     background: rgba(9, 18, 37, 0.82);
 }
 
-#satellite-size-mode-readout {
+#satellite-size-scale-readout {
     color: var(--cyan);
     font-family: "Consolas", "Courier New", monospace;
     font-weight: 700;
-}
-
-.size-mode-toggle-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.size-mode-toggle-row .toggle-chip {
-    min-width: 0;
-    padding-inline: 8px;
 }
 
 .language-toggle-row {

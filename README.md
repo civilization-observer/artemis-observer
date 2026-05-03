@@ -7,11 +7,14 @@ Statische GitHub-Pages-Seite fuer Earth Launch Watch, Artemis-II-Replay und Sate
 - GitHub Pages hostet nur statische Dateien: `index.html`, `styles.css`, `app.js`, `trajectory.js` und `data/*`.
 - `scripts/launch_worker.py` ist der einzige Code, der TheSpaceDevs Launch Library 2 abfragt.
 - `.github/workflows/launch-worker.yml` fuehrt den Worker geplant aus und committet geaenderte Dateien unter `data/`.
+- Kritische Browser-Runtimes und Texturen liegen lokal unter `vendor/` und `assets/textures/`.
+- `scripts/satellite_profile_rules.json` enthaelt gepruefte Namens-/Konstellationsregeln fuer SATCAT-Profile.
 - Das Frontend liest nur fertige Artefakte:
   - `data/launch-feed.json`
   - `data/launch-db.json`
   - `data/launch-stats.json`
   - `data/active-satellites.tle`, sobald der Worker den Satelliten-Snapshot erzeugt hat
+  - `data/satellite-profiles.json` fuer komprimierte SATCAT-Metadaten der aktiven Satelliten
 - Ein Seitenaufruf triggert keine Launch-Library-Abfrage und zaehlt nicht als Refresh.
 
 ## Worker-Logik

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import copy
+import csv
+import io
 import json
 import os
 import re
@@ -20,11 +22,13 @@ except ImportError:  # pragma: no cover
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data"
+PROFILE_RULES_PATH = REPO_ROOT / "scripts" / "satellite_profile_rules.json"
 FEED_PATH = DATA_DIR / "launch-feed.json"
 DB_PATH = DATA_DIR / "launch-db.json"
 STATS_PATH = DATA_DIR / "launch-stats.json"
 STATE_PATH = DATA_DIR / "worker-state.json"
 SATELLITE_TLE_PATH = DATA_DIR / "active-satellites.tle"
+SATELLITE_PROFILE_PATH = DATA_DIR / "satellite-profiles.json"
 SATELLITE_HISTORY_PATH = DATA_DIR / "satellite-live-history.json"
 ISS_OEM_PATH = DATA_DIR / "iss-oem-j2k.txt"
 
@@ -32,6 +36,7 @@ LL_BASE = "https://ll.thespacedevs.com/2.2.0"
 UPCOMING_URL = f"{LL_BASE}/launch/upcoming/?limit=48&mode=detailed"
 PREVIOUS_URL = f"{LL_BASE}/launch/previous/?limit={{limit}}&mode=detailed"
 SATELLITE_SOURCE_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle"
+SATCAT_RECORDS_URL = "https://celestrak.org/pub/satcat.csv"
 ISS_OEM_SOURCE_URL = "https://nasa-public-data.s3.amazonaws.com/iss-coords/current/ISS_OEM/ISS.OEM_J2K_EPH.txt"
 
 USER_AGENT = os.environ.get(
@@ -86,10 +91,18 @@ EMPTY_SATELLITE_HISTORY = {
     "samples": [],
 }
 
+EMPTY_SATELLITE_PROFILES = {
+    "generatedAt": None,
+    "source": "celestrak-satcat",
+    "profiles": {},
+    "stats": {"groups": {}},
+}
+
 EMPTY_STATE = {
     "lastFeedRefreshAt": None,
     "lastCheckRunAt": None,
     "lastSatelliteRefreshAt": None,
+    "lastSatelliteProfileRefreshAt": None,
     "lastIssOemRefreshAt": None,
     "pendingChecks": [],
     "lastErrors": [],
@@ -154,7 +167,27 @@ def write_text_if_changed(path: Path, text: str) -> bool:
     return True
 
 
-def request_json(url: str, timeout: int = 30) -> dict:
+def comparable_payload(value: object, ignored_keys: set[str]) -> object:
+    if isinstance(value, dict):
+        return {
+            key: comparable_payload(item, ignored_keys)
+            for key, item in sorted(value.items())
+            if key not in ignored_keys
+        }
+    if isinstance(value, list):
+        return [comparable_payload(item, ignored_keys) for item in value]
+    return value
+
+
+def semantically_equal(left: object, right: object, ignored_keys: set[str]) -> bool:
+    return comparable_payload(left, ignored_keys) == comparable_payload(right, ignored_keys)
+
+
+def preserve_if_semantically_equal(old_payload: dict, new_payload: dict, ignored_keys: set[str]) -> dict:
+    return old_payload if semantically_equal(old_payload, new_payload, ignored_keys) else new_payload
+
+
+def request_json(url: str, timeout: int = 30) -> object:
     request = urllib.request.Request(
         url,
         headers={
@@ -172,7 +205,7 @@ def request_text(url: str, timeout: int = 45) -> str:
         url,
         headers={
             "User-Agent": USER_AGENT,
-            "Accept": "text/plain",
+            "Accept": "*/*",
         },
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -585,7 +618,9 @@ def compute_stats(launches: list[dict], now: datetime, tz_name: str) -> dict:
         "week": make_period("week"),
         "month": make_period("month"),
         "year": make_period("year"),
-        "historicalSuccessfulLaunchesByYear": HISTORICAL_SUCCESSFUL_LAUNCHES_BY_YEAR,
+        "historicalSuccessfulLaunchesByYear": {
+            str(year): count for year, count in HISTORICAL_SUCCESSFUL_LAUNCHES_BY_YEAR.items()
+        },
     }
 
 
@@ -603,6 +638,227 @@ def count_tle_satellites(text: str) -> int:
         if line.startswith("1 ") and lines[index + 1].startswith("2 "):
             count += 1
     return count
+
+
+def active_tle_catalog_ids(text: str) -> set[str]:
+    ids: set[str] = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("1 "):
+            catnr = line[2:7].strip()
+            if catnr:
+                ids.add(str(int(catnr)) if catnr.isdigit() else catnr)
+    return ids
+
+
+def compact_satcat_record(record: dict) -> dict:
+    fields = {
+        "NORAD_CAT_ID": record.get("NORAD_CAT_ID") or record.get("noradCatId"),
+        "OBJECT_NAME": record.get("OBJECT_NAME") or record.get("objectName"),
+        "OBJECT_ID": record.get("OBJECT_ID") or record.get("objectId"),
+        "OBJECT_TYPE": record.get("OBJECT_TYPE") or record.get("objectType"),
+        "OWNER": record.get("OWNER") or record.get("owner"),
+        "LAUNCH_DATE": record.get("LAUNCH_DATE") or record.get("launchDate"),
+        "DECAY_DATE": record.get("DECAY_DATE") or record.get("decayDate"),
+        "RCS": record.get("RCS") or record.get("rcs"),
+    }
+    return {key: value for key, value in fields.items() if value not in (None, "")}
+
+
+SATCAT_OWNER_LABELS = {
+    "AB": "Saudi-Arabien",
+    "EUME": "Europa",
+    "EUTE": "Frankreich",
+    "GLOB": "USA",
+    "IM": "Vereinigtes Koenigreich",
+    "INTL": "USA/Luxemburg",
+    "ISS": "International",
+    "NATO": "NATO",
+    "O3B": "Luxemburg",
+    "PRC": "China",
+    "RASC": "Mauritius",
+    "SES": "Luxemburg",
+    "US": "USA",
+}
+
+
+SATCAT_TYPE_LABELS = {
+    "PAY": "Nutzlast/Satellit",
+    "R/B": "Raketenkörper",
+    "DEB": "Weltraumschrott",
+    "UNK": "Unbekanntes Objekt",
+}
+
+
+def load_satellite_profile_rules() -> list[dict]:
+    if not PROFILE_RULES_PATH.exists():
+        return []
+    try:
+        payload = json.loads(PROFILE_RULES_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"{PROFILE_RULES_PATH} is not valid JSON: {error}") from error
+    rules = payload.get("rules") if isinstance(payload, dict) else None
+    return [rule for rule in rules if isinstance(rule, dict)] if isinstance(rules, list) else []
+
+
+def satellite_profile_rule(record: dict, rules: list[dict]) -> dict | None:
+    name = text_value(record.get("OBJECT_NAME") or record.get("objectName")).upper()
+    object_id = text_value(record.get("OBJECT_ID") or record.get("objectId")).upper()
+    for rule in rules:
+        pattern = text_value(rule.get("pattern"))
+        if not pattern:
+            continue
+        fields = " ".join([name, object_id])
+        try:
+            if re.search(pattern, fields, re.IGNORECASE):
+                return rule
+        except re.error:
+            continue
+    return None
+
+
+def enriched_satellite_profile(record: dict, rules: list[dict]) -> dict:
+    owner = text_value(record.get("OWNER") or record.get("owner")).upper()
+    object_type = text_value(record.get("OBJECT_TYPE") or record.get("objectType")).upper()
+    rule = satellite_profile_rule(record, rules)
+
+    profile = {
+        "type": SATCAT_TYPE_LABELS.get(object_type, object_type or "Satellit"),
+        "operator": "",
+        "country": SATCAT_OWNER_LABELS.get(owner, owner or "Nicht eindeutig"),
+        "sizeLabel": "",
+        "source": "CelesTrak SATCAT geprüft; Betreiber nicht eindeutig",
+        "confidence": "catalog-only",
+        "operatorAmbiguous": True,
+    }
+    if rule:
+        for key in ("type", "operator", "country", "sizeLabel"):
+            value = text_value(rule.get(key))
+            if value:
+                profile[key] = value
+        profile["source"] = text_value(rule.get("source")) or f"CelesTrak SATCAT + Regel {rule.get('id', '')}".strip()
+        profile["confidence"] = text_value(rule.get("confidence")) or "rule"
+        profile["operatorAmbiguous"] = False
+        profile["ruleId"] = text_value(rule.get("id"))
+    return {key: value for key, value in profile.items() if value not in ("", None)}
+
+
+SATELLITE_GROUP_IDS = [
+    "starlink",
+    "qianfan",
+    "oneweb",
+    "kuiper",
+    "communications",
+    "navigation",
+    "earth-observation",
+    "weather",
+    "military",
+    "science",
+    "ambiguous",
+]
+
+
+def record_text_parts(record: dict, profile: dict) -> list[str]:
+    return [
+        text_value(record.get("OBJECT_NAME") or record.get("objectName")),
+        text_value(record.get("OBJECT_ID") or record.get("objectId")),
+        text_value(record.get("OWNER") or record.get("owner")),
+        text_value(profile.get("type")),
+        text_value(profile.get("operator")),
+        text_value(profile.get("country")),
+        text_value(profile.get("source")),
+        text_value(profile.get("confidence")),
+    ]
+
+
+def record_matches_any_text(record: dict, profile: dict, patterns: list[str]) -> bool:
+    parts = " ".join(record_text_parts(record, profile))
+    return any(re.search(pattern, parts, re.IGNORECASE) for pattern in patterns)
+
+
+def satellite_record_matches_group(record: dict, profile: dict, group_id: str) -> bool:
+    name = text_value(record.get("OBJECT_NAME") or record.get("objectName"))
+    if group_id == "starlink":
+        return re.search(r"^STARLINK\b", name, re.IGNORECASE) is not None
+    if group_id == "qianfan":
+        return re.search(r"^QIANFAN\b", name, re.IGNORECASE) is not None
+    if group_id == "oneweb":
+        return re.search(r"^ONEWEB\b", name, re.IGNORECASE) is not None
+    if group_id == "kuiper":
+        return record_matches_any_text(record, profile, [r"kuiper"])
+    if group_id == "communications":
+        return record_matches_any_text(record, profile, [r"kommunikations", r"communications?", r"data relay", r"datenrela"])
+    if group_id == "navigation":
+        return record_matches_any_text(record, profile, [r"navigation", r"navigations", r"gps", r"navstar", r"galileo", r"glonass", r"beidou"])
+    if group_id == "earth-observation":
+        return record_matches_any_text(record, profile, [r"erdbeobachtung", r"earth observation", r"landsat", r"sentinel", r"planet labs"])
+    if group_id == "weather":
+        return record_matches_any_text(record, profile, [r"wetter", r"weather", r"environment", r"umwelt", r"noaa", r"goes", r"meteosat"])
+    if group_id == "military":
+        return record_matches_any_text(record, profile, [r"milit", r"military", r"aufkl", r"reconnaissance", r"space development agency", r"\bnrol\b", r"\bnoss\b"])
+    if group_id == "science":
+        return record_matches_any_text(record, profile, [r"wissenschaft", r"science", r"telescope", r"teleskop", r"hubble", r"\bhst\b", r"jwst"])
+    if group_id == "ambiguous":
+        return bool(profile.get("operatorAmbiguous")) or text_value(profile.get("confidence")) == "catalog-only"
+    return False
+
+
+def date_bucket(value: object) -> str:
+    parsed = parse_time(value)
+    if parsed is None:
+        return ""
+    return parsed.date().isoformat()
+
+
+def increment_bucket(target: dict[str, int], key: str) -> None:
+    if not key:
+        return
+    target[key] = target.get(key, 0) + 1
+
+
+def build_satellite_group_stats(records: list[dict], active_ids: set[str], rules: list[dict]) -> dict:
+    total = {
+        "activeCount": 0,
+        "addedByDay": {},
+        "decayedByDay": {},
+        "source": "CelesTrak SATCAT LAUNCH_DATE/DECAY_DATE",
+    }
+    groups = {
+        group_id: {
+            "activeCount": 0,
+            "addedByDay": {},
+            "decayedByDay": {},
+            "source": "CelesTrak SATCAT LAUNCH_DATE/DECAY_DATE",
+        }
+        for group_id in SATELLITE_GROUP_IDS
+    }
+
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        catnr = record.get("NORAD_CAT_ID") or record.get("noradCatId")
+        if catnr is None:
+            continue
+        catnr_text = str(catnr).strip()
+        normalized = str(int(catnr_text)) if catnr_text.isdigit() else catnr_text
+        profile = enriched_satellite_profile(record, rules)
+        launch_day = date_bucket(record.get("LAUNCH_DATE") or record.get("launchDate"))
+        decay_day = date_bucket(record.get("DECAY_DATE") or record.get("decayDate"))
+        is_active = normalized in active_ids
+        if is_active:
+            total["activeCount"] += 1
+            increment_bucket(total["addedByDay"], launch_day)
+        increment_bucket(total["decayedByDay"], decay_day)
+
+        for group_id, stats in groups.items():
+            if not satellite_record_matches_group(record, profile, group_id):
+                continue
+            if is_active:
+                stats["activeCount"] += 1
+                increment_bucket(stats["addedByDay"], launch_day)
+            increment_bucket(stats["decayedByDay"], decay_day)
+
+    return {"total": total, "groups": groups}
 
 
 def append_satellite_history_sample(history: dict, now: datetime, live_count: int) -> dict:
@@ -654,6 +910,55 @@ def refresh_satellites(now: datetime, state: dict, force: bool, errors: list[str
         return False, None
 
 
+def refresh_satellite_profiles(now: datetime, state: dict, force: bool, errors: list[str]) -> bool:
+    if not should_refresh(state.get("lastSatelliteProfileRefreshAt"), SATELLITE_REFRESH_INTERVAL, now, force) and SATELLITE_PROFILE_PATH.exists():
+        return False
+    if not SATELLITE_TLE_PATH.exists():
+        return False
+
+    active_ids = active_tle_catalog_ids(SATELLITE_TLE_PATH.read_text(encoding="utf-8", errors="replace"))
+    if not active_ids:
+        return False
+
+    try:
+        csv_text = request_text(SATCAT_RECORDS_URL, timeout=60)
+        payload = list(csv.DictReader(io.StringIO(csv_text)))
+        if not payload:
+            raise RuntimeError("CelesTrak SATCAT returned an unexpected payload")
+        rules = load_satellite_profile_rules()
+        stats = build_satellite_group_stats(payload, active_ids, rules)
+        profiles = {}
+        for record in payload:
+            if not isinstance(record, dict):
+                continue
+            catnr = record.get("NORAD_CAT_ID") or record.get("noradCatId")
+            if catnr is None:
+                continue
+            catnr_text = str(catnr).strip()
+            normalized = str(int(catnr_text)) if catnr_text.isdigit() else catnr_text
+            if normalized in active_ids:
+                profiles[normalized] = {
+                    "satcat": compact_satcat_record(record),
+                    "profile": enriched_satellite_profile(record, rules),
+                    "wikidata": None,
+                }
+
+        output = {
+            "generatedAt": to_iso(now),
+            "source": "celestrak-satcat",
+            "stats": stats,
+            "profiles": profiles,
+        }
+        old_output = read_json(SATELLITE_PROFILE_PATH, EMPTY_SATELLITE_PROFILES)
+        output = preserve_if_semantically_equal(old_output, output, {"generatedAt"})
+        changed = write_json_if_changed(SATELLITE_PROFILE_PATH, output)
+        state["lastSatelliteProfileRefreshAt"] = to_iso(now)
+        return changed
+    except Exception as error:  # noqa: BLE001
+        errors.append(f"satellite profile refresh failed: {error}")
+        return False
+
+
 def refresh_iss_oem(now: datetime, state: dict, force: bool, errors: list[str]) -> bool:
     if not should_refresh(state.get("lastIssOemRefreshAt"), ISS_OEM_REFRESH_INTERVAL, now, force) and ISS_OEM_PATH.exists():
         return False
@@ -689,12 +994,16 @@ def main() -> int:
     try:
         feed_payload = read_json(FEED_PATH, EMPTY_FEED)
         db_payload = read_json(DB_PATH, EMPTY_DB)
+        stats_payload = read_json(STATS_PATH, EMPTY_STATS)
         satellite_history_payload = read_json(SATELLITE_HISTORY_PATH, EMPTY_SATELLITE_HISTORY)
         state = read_json(STATE_PATH, EMPTY_STATE)
     except RuntimeError as error:
         print(error, file=sys.stderr)
         return 2
 
+    original_db_payload = copy.deepcopy(db_payload)
+    original_stats_payload = copy.deepcopy(stats_payload)
+    original_state = copy.deepcopy(state)
     db_by_id = existing_launches_by_id(db_payload)
 
     if args.seed_history:
@@ -721,16 +1030,30 @@ def main() -> int:
         "source": "launch-worker:observed-db",
         "launches": launches,
     }
+    db_payload = preserve_if_semantically_equal(
+        original_db_payload,
+        db_payload,
+        {"generatedAt", "updatedAt"},
+    )
 
     stats_payload = compute_stats(launches, now, os.environ.get("STATS_TIMEZONE", "Europe/Berlin"))
+    stats_payload = preserve_if_semantically_equal(
+        original_stats_payload,
+        stats_payload,
+        {"generatedAt"},
+    )
     satellite_changed, satellite_live_count = refresh_satellites(now, state, args.force_satellites, errors)
     if satellite_live_count is not None:
         satellite_history_payload = append_satellite_history_sample(satellite_history_payload, now, satellite_live_count)
+    satellite_profile_changed = refresh_satellite_profiles(now, state, args.force_satellites, errors)
     iss_oem_changed = refresh_iss_oem(now, state, args.force_iss_oem, errors)
 
-    state["lastCheckRunAt"] = to_iso(now)
     state["pendingChecks"] = pending_checks(launches, now)
     state["lastErrors"] = errors[-20:]
+    if not semantically_equal(original_state, state, {"lastCheckRunAt"}):
+        state["lastCheckRunAt"] = to_iso(now)
+    else:
+        state = original_state
 
     writes = [
         (FEED_PATH, feed_payload),
@@ -744,6 +1067,8 @@ def main() -> int:
             changed_paths.append(str(path.relative_to(REPO_ROOT)))
     if satellite_changed:
         changed_paths.append(str(SATELLITE_TLE_PATH.relative_to(REPO_ROOT)))
+    if satellite_profile_changed:
+        changed_paths.append(str(SATELLITE_PROFILE_PATH.relative_to(REPO_ROOT)))
     if iss_oem_changed:
         changed_paths.append(str(ISS_OEM_PATH.relative_to(REPO_ROOT)))
 

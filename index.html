@@ -46,10 +46,10 @@
                 <div class="small-label">Anbieter</div>
                 <strong id="launch-stat-orgs">--</strong>
             </button>
-            <div class="stat-card">
+            <button type="button" class="stat-card" data-stat-panel="pads" aria-label="Launchpad-Liste oeffnen">
                 <div class="small-label">Pads</div>
                 <strong id="launch-stat-pads">--</strong>
-            </div>
+            </button>
             <button type="button" class="stat-card" data-stat-panel="launch-week" aria-label="Wochenverlauf erfolgreicher Starts oeffnen">
                 <div class="small-label">Erfolgreich Woche</div>
                 <strong id="launch-stat-success-week">--</strong>
@@ -72,6 +72,10 @@
             <button type="button" class="stat-card" data-stat-panel="sat-live" aria-label="Verlauf live getrackter Satelliten oeffnen">
                 <div class="small-label">Live getrackt</div>
                 <strong id="sat-stat-live">--</strong>
+            </button>
+            <button type="button" class="stat-card" data-stat-panel="sat-decayed" aria-label="Decay-Statistik oeffnen">
+                <div class="small-label" id="sat-stat-decayed-label">Decayed 100d</div>
+                <strong id="sat-stat-decayed">--</strong>
             </button>
         </div>
     </aside>
@@ -171,13 +175,13 @@
     <aside class="panel" id="satellite-focus-panel" aria-hidden="true">
         <div class="panel-head">
             <div>
-                <div class="section-kicker">Satellit verfolgt</div>
+                <div class="section-kicker" id="sat-focus-kicker">Satellit verfolgt</div>
                 <h3 id="sat-focus-title">--</h3>
                 <div class="watch-subtitle" id="sat-focus-subtitle">Keine Verfolgung aktiv</div>
             </div>
             <button type="button" class="panel-arrow" id="sat-focus-stop" aria-label="Satellitenverfolgung beenden">&times;</button>
         </div>
-        <div class="sat-focus-grid">
+        <div class="sat-focus-grid" id="sat-focus-details-grid">
             <div>
                 <span>Typ</span>
                 <strong id="sat-focus-type">--</strong>
@@ -233,6 +237,33 @@
             <div>
                 <span>Laenge</span>
                 <strong id="sat-focus-longitude">--</strong>
+            </div>
+        </div>
+        <div class="sat-constellation-panel is-hidden" id="sat-constellation-panel">
+            <div class="sat-focus-grid">
+                <div>
+                    <span>Aktiv im Katalog</span>
+                    <strong id="sat-group-active">--</strong>
+                </div>
+                <div>
+                    <span>Sichtbar mit Orbitfilter</span>
+                    <strong id="sat-group-visible">--</strong>
+                </div>
+                <div>
+                    <span>Neu im Zeitraum</span>
+                    <strong id="sat-group-added">--</strong>
+                </div>
+                <div>
+                    <span>Decayed/Reentry</span>
+                    <strong id="sat-group-decayed">--</strong>
+                </div>
+            </div>
+            <div class="window-slider-wrap">
+                <div class="window-slider-head">
+                    <span class="small-label">Statistikfenster</span>
+                    <strong id="sat-group-window-readout">100 Tage</strong>
+                </div>
+                <input type="range" id="sat-group-window-slider" min="1" max="365" value="100" step="1">
             </div>
         </div>
         <button type="button" class="action-btn action-btn-accent sat-stop-wide" id="sat-focus-stop-wide">Verfolgung beenden</button>
@@ -320,6 +351,10 @@
                 <button type="button" class="toggle-chip" id="sat-filter-geo" data-sat-filter="GEO" aria-pressed="true">GEO</button>
                 <button type="button" class="toggle-chip" id="sat-filter-heo" data-sat-filter="HEO" aria-pressed="true">HEO</button>
             </div>
+            <div class="sat-group-filter">
+                <label for="satellite-group-filter" class="small-label">Konstellation / Kategorie</label>
+                <select id="satellite-group-filter"></select>
+            </div>
             <p id="satellite-search-status">Lade Satellitenkatalog ...</p>
         </section>
 
@@ -372,13 +407,9 @@
             <div class="size-mode-setting-wrap">
                 <div class="mission-slider-head">
                     <span class="small-label">Punktgroesse</span>
-                    <span id="satellite-size-mode-readout">Kleiner</span>
+                    <span id="satellite-size-scale-readout">110%</span>
                 </div>
-                <div class="size-mode-toggle-row" role="group" aria-label="Punktgroesse">
-                    <button type="button" class="toggle-chip" id="satellite-size-mode-default" data-satellite-size-mode="default" aria-pressed="false">Normal</button>
-                    <button type="button" class="toggle-chip" id="satellite-size-mode-reduced" data-satellite-size-mode="reduced" aria-pressed="true">Kleiner</button>
-                    <button type="button" class="toggle-chip" id="satellite-size-mode-realistic" data-satellite-size-mode="realistic" aria-pressed="false">Realistisch</button>
-                </div>
+                <input type="range" id="satellite-size-scale" min="5" max="250" value="110" step="1">
             </div>
         </section>
 
@@ -461,8 +492,8 @@
     <script type="importmap">
     {
         "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            "three": "./vendor/three/three.module.js",
+            "three/addons/": "./vendor/three/addons/"
         }
     }
     </script>
